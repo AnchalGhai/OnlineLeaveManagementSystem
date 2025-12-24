@@ -1,0 +1,542 @@
+﻿@model LeaveManagementSystem.Models.Entities.LeaveApplication
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "View Manager Leave Request";
+
+    var availableBalance = ViewBag.AvailableBalance ?? 0;
+    var leaveBalance = ViewBag.LeaveBalance as LeaveManagementSystem.Models.Entities.LeaveBalance;
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-tie me-2"></i>Manager Leave Request Details</h2>
+        <div>
+            <a href="@Url.Action("ManagerLeaveRequests", "Dashboard")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Manager Leaves
+            </a>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Left Column - Request Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Leave Request Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Manager Name</label>
+                                <div class="info-value">@Model.User.FullName</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Department</label>
+                                <div class="info-value">@Model.User.Department?.Name</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Email</label>
+                                <div class="info-value">@Model.User.Email</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Leave Type</label>
+                                <div class="info-value">
+                                    <span class="badge bg-secondary">@Model.LeaveType?.Name</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Start Date</label>
+                                <div class="info-value">
+                                    <i class="fas fa-calendar-day me-1"></i>@Model.StartDate.ToString("dddd, dd MMMM yyyy")
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">End Date</label>
+                                <div class="info-value">
+                                    <i class="fas fa-calendar-day me-1"></i>@Model.EndDate.ToString("dddd, dd MMMM yyyy")
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Total Days</label>
+                                <div class="info-value">
+                                    <span class="badge bg-info">@Model.TotalDays day(s)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Applied On</label>
+                                <div class="info-value">
+                                    <i class="fas fa-clock me-1"></i>@Model.AppliedOn.ToString("dd MMM yyyy hh:mm tt")
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Reason for Leave</label>
+                                <div class="info-value p-3 bg-light rounded">
+                                    @Model.Reason
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Timeline -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Status Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item @(Model.AppliedOn != null ? "active" : "")">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h6>Applied</h6>
+                                <small class="text-muted">@Model.AppliedOn.ToString("dd MMM yyyy hh:mm tt")</small>
+                            </div>
+                        </div>
+                        @if (Model.Status == "Approved" || Model.Status == "Rejected")
+                        {
+                            <div class="timeline-item active">
+                                <div class="timeline-marker @(Model.Status == "Approved" ? "bg-success" : "bg-danger")"></div>
+                                <div class="timeline-content">
+                                    <h6>@Model.Status by Admin</h6>
+                                    <small class="text-muted">@Model.ActionDate?.ToString("dd MMM yyyy hh:mm tt")</small>
+                                    @if (!string.IsNullOrEmpty(Model.ManagerComments))
+                                    {
+                                        <div class="mt-2 p-2 bg-light rounded">
+                                            <small><strong>Comments:</strong> @Model.ManagerComments</small>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="timeline-item">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h6>Pending Admin Approval</h6>
+                                    <small class="text-muted">Awaiting action</small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Actions & Balance -->
+        <div class="col-md-4">
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Current Status</h5>
+                    @if (Model.Status == "Approved")
+                    {
+                        <div class="status-badge approved mb-3">
+                            <i class="fas fa-check-circle fa-3x"></i>
+                            <h4 class="mt-2">APPROVED</h4>
+                        </div>
+                        <p class="text-muted">This leave has been approved by Admin.</p>
+                    }
+                    else if (Model.Status == "Pending")
+                    {
+                        <div class="status-badge pending mb-3">
+                            <i class="fas fa-clock fa-3x"></i>
+                            <h4 class="mt-2">PENDING</h4>
+                        </div>
+                        <p class="text-muted">Awaiting Admin approval.</p>
+                    }
+                    else if (Model.Status == "Rejected")
+                    {
+                        <div class="status-badge rejected mb-3">
+                            <i class="fas fa-times-circle fa-3x"></i>
+                            <h4 class="mt-2">REJECTED</h4>
+                        </div>
+                        <p class="text-muted">This leave has been rejected by Admin.</p>
+                    }
+                    else if (Model.Status == "Cancelled")
+                    {
+                        <div class="status-badge cancelled mb-3">
+                            <i class="fas fa-ban fa-3x"></i>
+                            <h4 class="mt-2">CANCELLED</h4>
+                        </div>
+                        <p class="text-muted">This leave has been cancelled.</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Manager's Leave Balance -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Manager's Leave Balance</h5>
+                </div>
+                <div class="card-body">
+                    @if (leaveBalance != null)
+                    {
+                        <div class="balance-info">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Leave Type:</span>
+                                <strong>@Model.LeaveType?.Name</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Total Assigned:</span>
+                                <strong>@leaveBalance.TotalAssigned days</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Used:</span>
+                                <strong>@leaveBalance.Used days</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Remaining:</span>
+                                <strong class="@(availableBalance < 5 ? "text-danger" : "text-success")">
+                                    @availableBalance days
+                                </strong>
+                            </div>
+                            <hr />
+                            <div class="d-flex justify-content-between">
+                                <span>Requested Days:</span>
+                                <strong>@Model.TotalDays days</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>After Approval:</span>
+                                <strong class="@((availableBalance - Model.TotalDays) < 0 ? "text-danger" : "text-success")">
+                                    @(availableBalance - Model.TotalDays) days
+                                </strong>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            No leave balance found for this manager.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            @if (Model.Status == "Pending")
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Admin Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can approve or reject this manager's leave request.
+                        </div>
+
+                        <form id="approveForm" method="post" action="@Url.Action("ApproveManagerLeave", "Dashboard")" class="mb-3">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.LeaveId" />
+                            <div class="mb-3">
+                                <label for="approveComments" class="form-label">Comments (Optional)</label>
+                                <textarea class="form-control" id="approveComments" name="comments" rows="2"
+                                      placeholder="Add any comments for the manager..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100"
+                                    onclick="return confirm('Are you sure you want to APPROVE this leave request?')">
+                                <i class="fas fa-check me-1"></i>Approve Leave
+                            </button>
+                        </form>
+
+                        <form id="rejectForm" method="post" action="@Url.Action("RejectManagerLeave", "Dashboard")">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.LeaveId" />
+                            <div class="mb-3">
+                                <label for="rejectComments" class="form-label">Comments (Required)</label>
+                                <textarea class="form-control" id="rejectComments" name="comments" rows="2"
+                                      placeholder="Reason for rejecting the leave request..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger w-100"
+                                    onclick="return confirm('Are you sure you want to REJECT this leave request?')">
+                                <i class="fas fa-times me-1"></i>Reject Leave
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Auto-expand textareas based on content
+            $('textarea').each(function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+
+            // Form validation
+            $('#rejectForm').submit(function(e) {
+                const comments = $('#rejectComments').val().trim();
+                if (!comments) {
+                    e.preventDefault();
+                    alert('Please provide a reason for rejecting the leave request.');
+                    $('#rejectComments').focus();
+                    return false;
+                }
+            });
+        });
+    </script>
+}
+<style>
+    .info-item .info-value {
+        font-weight: 500;
+        font-size: 1.1rem;
+        color: var(--text-light) !important; /* ✅ Theme color */
+    }
+
+    .status-badge {
+        padding: 20px;
+        border-radius: 8px;
+        background-color: var(--darker-surface) !important; /* ✅ Theme background */
+    }
+
+        .status-badge.approved {
+            color: #22c55e !important; /* ✅ Green from theme */
+            background-color: rgba(34, 197, 94, 0.1) !important;
+        }
+
+        .status-badge.pending {
+            color: #f59e0b !important; /* ✅ Yellow/Orange from theme */
+            background-color: rgba(245, 158, 11, 0.1) !important;
+        }
+
+        .status-badge.rejected {
+            color: #ef4444 !important; /* ✅ Red from theme */
+            background-color: rgba(239, 68, 68, 0.1) !important;
+        }
+
+        .status-badge.cancelled {
+            color: #6b7280 !important; /* ✅ Gray from theme */
+            background-color: rgba(107, 114, 128, 0.1) !important;
+        }
+
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--border-color) !important; /* ✅ Theme border */
+        }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+    .timeline-marker {
+        position: absolute;
+        left: -33px;
+        top: 0;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: #6b7280 !important; /* ✅ Theme gray */
+        border: 3px solid var(--dark-surface) !important; /* ✅ Theme background */
+        z-index: 1;
+    }
+
+    .timeline-item.active .timeline-marker {
+        background-color: var(--primary-accent) !important; /* ✅ Theme primary color */
+        border-color: var(--dark-surface) !important;
+    }
+
+    .balance-info {
+        font-size: 0.95rem;
+        color: var(--text-light) !important; /* ✅ Theme text color */
+    }
+
+    /* ✅ Theme form controls */
+    .form-control {
+        background-color: var(--darker-surface) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-light) !important;
+    }
+
+        .form-control:focus {
+            background-color: var(--darker-surface) !important;
+            border-color: var(--primary-accent) !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+            color: var(--text-light) !important;
+        }
+
+    .form-label {
+        color: var(--text-light) !important;
+    }
+
+    /* ✅ Theme cards */
+    .card {
+        background-color: var(--dark-surface) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    .card-header {
+        background-color: var(--darker-surface) !important;
+        border-bottom-color: var(--border-color) !important;
+        color: var(--text-light) !important;
+    }
+
+    .card-body {
+        color: var(--text-light) !important;
+    }
+
+    /* ✅ Theme alerts */
+    .alert {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-light) !important;
+    }
+
+    .alert-success {
+        background-color: rgba(34, 197, 94, 0.1) !important;
+        border-color: rgba(34, 197, 94, 0.3) !important;
+        color: #a7f3d0 !important;
+    }
+
+    .alert-danger {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border-color: rgba(239, 68, 68, 0.3) !important;
+        color: #fecaca !important;
+    }
+
+    .alert-warning {
+        background-color: rgba(245, 158, 11, 0.1) !important;
+        border-color: rgba(245, 158, 11, 0.3) !important;
+        color: #fde68a !important;
+    }
+
+    .alert-info {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+        border-color: rgba(59, 130, 246, 0.3) !important;
+        color: #bfdbfe !important;
+    }
+
+    /* ✅ Theme badges */
+    .badge {
+        color: white !important;
+    }
+
+    .bg-secondary {
+        background-color: #6b7280 !important; /* ✅ Theme gray */
+    }
+
+    .bg-info {
+        background-color: #3b82f6 !important; /* ✅ Theme blue */
+    }
+
+    /* ✅ Theme buttons */
+    .btn-outline-secondary {
+        color: var(--text-light) !important;
+        border-color: var(--border-color) !important;
+    }
+
+        .btn-outline-secondary:hover {
+            background-color: var(--darker-surface) !important;
+            color: var(--text-light) !important;
+        }
+
+    .btn-success {
+        background-color: #22c55e !important;
+        border-color: #22c55e !important;
+    }
+
+        .btn-success:hover {
+            background-color: #16a34a !important;
+            border-color: #16a34a !important;
+        }
+
+    .btn-danger {
+        background-color: #ef4444 !important;
+        border-color: #ef4444 !important;
+    }
+
+        .btn-danger:hover {
+            background-color: #dc2626 !important;
+            border-color: #dc2626 !important;
+        }
+
+    /* ✅ Theme background colors */
+    .bg-light {
+        background-color: var(--darker-surface) !important; /* ✅ Changed from light to dark */
+        color: var(--text-light) !important;
+    }
+
+    .text-muted {
+        color: #9ca3af !important; /* ✅ Lighter gray for muted text */
+    }
+
+    .text-success {
+        color: #22c55e !important; /* ✅ Theme green */
+    }
+
+    .text-danger {
+        color: #ef4444 !important; /* ✅ Theme red */
+    }
+
+    /* ✅ Reason box styling */
+    .info-value.p-3.bg-light.rounded {
+        background-color: var(--darker-surface) !important;
+        color: var(--text-light) !important;
+        border: 1px solid var(--border-color) !important;
+    }
+
+    /* ✅ Timeline content */
+    .timeline-content h6 {
+        color: var(--text-light) !important;
+    }
+
+    .timeline-content small.text-muted {
+        color: #9ca3af !important;
+    }
+</style>

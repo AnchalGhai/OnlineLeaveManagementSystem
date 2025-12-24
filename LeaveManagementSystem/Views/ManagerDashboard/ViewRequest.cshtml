@@ -1,0 +1,453 @@
+﻿@model LeaveManagementSystem.Models.Entities.LeaveApplication
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var leaveBalance = ViewBag.LeaveBalance as LeaveManagementSystem.Models.Entities.LeaveBalance;
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-eye me-2"></i>Leave Request Details</h2>
+        <div>
+            <a href="@Url.Action("PendingRequests", "ManagerDashboard")" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-1"></i>Back to Pending Requests
+            </a>
+            <a href="@Url.Action("Index", "ManagerDashboard")" class="btn btn-outline-primary">
+                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Left Column: Request Details -->
+        <div class="col-lg-8">
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="fas fa-info-circle me-2"></i>Request Information</h4>
+                    <span class="badge @(Model.Status == "Pending" ? "bg-warning" :
+                                                                                            Model.Status == "Approved" ? "bg-success" : "bg-danger") fs-6">
+                        @Model.Status
+                    </span>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="detail-card">
+                            <div class="detail-icon bg-primary">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="detail-content">
+                                <div class="detail-label">Employee</div>
+                                <div class="detail-value">@Model.User?.FullName</div>
+                                <div class="detail-subtext">@Model.User?.Email</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="detail-card">
+                            <div class="detail-icon bg-info">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div class="detail-content">
+                                <div class="detail-label">Department</div>
+                                <div class="detail-value">@Model.User?.Department?.Name</div>
+                                <div class="detail-subtext">
+                                    @if (Model.User?.Manager != null)
+                                    {
+                                        <span>Manager: @Model.User.Manager.FullName</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="info-card">
+                            <div class="info-label">Leave Type</div>
+                            <div class="info-value">
+                                <span class="badge bg-info fs-6">@Model.LeaveType?.Name</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-card">
+                            <div class="info-label">Total Days</div>
+                            <div class="info-value">
+                                <span class="badge bg-secondary fs-6">@Model.TotalDays days</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="info-card">
+                            <div class="info-label">Applied On</div>
+                            <div class="info-value">@Model.AppliedOn.ToString("dd MMM yyyy hh:mm tt")</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="info-card">
+                            <div class="info-label">Start Date</div>
+                            <div class="info-value">
+                                <div>@Model.StartDate.ToString("dddd, dd MMMM yyyy")</div>
+                                <small class="text-muted">@Model.StartDate.ToString("hh:mm tt")</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-card">
+                            <div class="info-label">End Date</div>
+                            <div class="info-value">
+                                <div>@Model.EndDate.ToString("dddd, dd MMMM yyyy")</div>
+                                <small class="text-muted">@Model.EndDate.ToString("hh:mm tt")</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reason -->
+                <div class="mb-4">
+                    <h6><i class="fas fa-comment me-2"></i>Reason for Leave</h6>
+                    <div class="reason-card">
+                        @if (!string.IsNullOrEmpty(Model.Reason))
+                        {
+                            @Model.Reason
+                        }
+                        else
+                        {
+                            <span class="text-muted">No reason provided</span>
+                        }
+                    </div>
+                </div>
+
+                <!-- Manager Comments (if any) -->
+                @if (!string.IsNullOrEmpty(Model.ManagerComments))
+                {
+                    <div class="mb-4">
+                        <h6><i class="fas fa-comment-dots me-2"></i>Manager Comments</h6>
+                        <div class="comment-card">
+                            @Model.ManagerComments
+                        </div>
+                    </div>
+                }
+
+                <!-- Action Date (if processed) -->
+                @if (Model.ActionDate.HasValue)
+                {
+                    <div class="info-card">
+                        <div class="info-label">Action Taken On</div>
+                        <div class="info-value">@Model.ActionDate.Value.ToString("dd MMM yyyy hh:mm tt")</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right Column: Actions & Balance -->
+        <div class="col-lg-4">
+            @if (Model.Status == "Pending")
+            {
+                <!-- Approval Actions -->
+                <div class="section-card mb-4">
+                    <h5 class="mb-3"><i class="fas fa-tasks me-2"></i>Take Action</h5>
+
+                    <!-- Approve Form -->
+                    <form method="post" asp-controller="ManagerDashboard" asp-action="ApproveRequest" class="mb-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.LeaveId" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Comments (Optional)</label>
+                            <textarea name="comments" class="form-control" rows="3"
+                                  placeholder="Add approval comments..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100"
+                                onclick="return confirm('Approve this leave request?')">
+                            <i class="fas fa-check me-2"></i>Approve Leave
+                        </button>
+                    </form>
+
+                    <!-- Reject Form -->
+                    <form method="post" asp-controller="ManagerDashboard" asp-action="RejectRequest">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.LeaveId" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Rejection *</label>
+                            <textarea name="comments" class="form-control" rows="3"
+                                  placeholder="Provide reason for rejection..." required></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger w-100"
+                                onclick="return confirm('Reject this leave request?')">
+                            <i class="fas fa-times me-2"></i>Reject Leave
+                        </button>
+                    </form>
+                </div>
+            }
+
+            <!-- Leave Balance -->
+            <div class="section-card">
+                <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Employee's Leave Balance</h5>
+
+                @if (leaveBalance != null)
+                {
+                    <div class="balance-card">
+                        <div class="balance-header">
+                            <h6>@Model.LeaveType?.Name Balance</h6>
+                            <span class="badge @(leaveBalance.Remaining < 5 ? "bg-danger" : "bg-success")">
+                                @leaveBalance.Remaining days left
+                            </span>
+                        </div>
+
+                        <div class="progress mb-3" style="height: 12px;">
+                            @{
+                                var usagePercentage = leaveBalance.TotalAssigned > 0 ?
+                                (leaveBalance.Used * 100) / leaveBalance.TotalAssigned : 0;
+                                var remainingPercentage = 100 - usagePercentage;
+                            }
+                            <div class="progress-bar bg-success" style="width: @remainingPercentage%"
+                                 title="Remaining: @leaveBalance.Remaining days"></div>
+                            <div class="progress-bar bg-warning" style="width: @usagePercentage%"
+                                 title="Used: @leaveBalance.Used days"></div>
+                        </div>
+
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="balance-stat">
+                                    <div class="balance-value text-primary">@leaveBalance.TotalAssigned</div>
+                                    <div class="balance-label">Total</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="balance-stat">
+                                    <div class="balance-value text-warning">@leaveBalance.Used</div>
+                                    <div class="balance-label">Used</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="balance-stat">
+                                    <div class="balance-value text-success">@leaveBalance.Remaining</div>
+                                    <div class="balance-label">Remaining</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Request vs Balance Comparison -->
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="comparison">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>This Request:</span>
+                                    <span class="fw-bold">@Model.TotalDays days</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Will Leave:</span>
+                                    <span class="fw-bold @((leaveBalance.Remaining - Model.TotalDays) < 0 ? "text-danger" : "text-success")">
+                                        @(leaveBalance.Remaining - Model.TotalDays) days
+                                    </span>
+                                </div>
+
+                                @if (Model.TotalDays > leaveBalance.Remaining)
+                                {
+                                    <div class="alert alert-danger mt-2 p-2">
+                                        <small>
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            This request exceeds available balance by @(Model.TotalDays - leaveBalance.Remaining) days
+                                        </small>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-success mt-2 p-2">
+                                        <small>
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            Sufficient balance available
+                                        </small>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-3">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                        <p class="text-muted">Leave balance information not available</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .detail-card {
+        display: flex;
+        align-items: center;
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1rem;
+        transition: all 0.3s;
+    }
+
+        .detail-card:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-2px);
+        }
+
+    .detail-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        margin-right: 1rem;
+    }
+
+        .detail-icon.bg-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+
+        .detail-icon.bg-info {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        }
+
+    .detail-content {
+        flex: 1;
+    }
+
+    .detail-label {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+    }
+
+    .detail-value {
+        font-size: 1.1rem;
+        color: var(--text-light);
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .detail-subtext {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .info-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-label {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+    }
+
+    .info-value {
+        font-size: 1rem;
+        color: var(--text-light);
+        font-weight: 500;
+    }
+
+    .reason-card, .comment-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .comment-card {
+        background: rgba(59, 130, 246, 0.05);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .balance-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+
+    .balance-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .balance-stat {
+        text-align: center;
+    }
+
+    .balance-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .balance-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 0.25rem;
+    }
+
+    .comparison {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        border: none;
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        border: none;
+    }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+</style>

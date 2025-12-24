@@ -1,0 +1,285 @@
+﻿@model List<LeaveManagementSystem.Models.Entities.LeaveApplication>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var managerId = Context.Session.GetInt32("UserId") ?? 0;
+    var pendingCount = Model.Count;
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-hourglass-half me-2"></i>Pending Leave Requests</h2>
+        <div>
+            <a href="@Url.Action("Index", "ManagerDashboard")" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+            @if (pendingCount > 0)
+            {
+                <span class="badge bg-warning fs-6">
+                    <i class="fas fa-clock me-1"></i>@pendingCount Pending
+                </span>
+            }
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (Model.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-dark-theme">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Leave Type</th>
+                        <th>Date Range</th>
+                        <th>Days</th>
+                        <th>Reason</th>
+                        <th>Applied On</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var request in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-circle-sm bg-primary me-2">
+                                        @request.User?.FullName?[0]
+                                    </div>
+                                    <div>
+                                        <div class="fw-medium">@request.User?.FullName</div>
+                                        <small class="text-muted">@request.User?.Email</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>@request.User?.Department?.Name</td>
+                            <td>
+                                <span class="badge bg-info">@request.LeaveType?.Name</span>
+                            </td>
+                            <td>
+                                <div>@request.StartDate.ToString("dd MMM")</div>
+                                <small class="text-muted">to @request.EndDate.ToString("dd MMM yyyy")</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">@request.TotalDays days</span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(request.Reason))
+                                {
+                                    <span class="text-truncate" style="max-width: 150px; display: inline-block;"
+                                          title="@request.Reason">@request.Reason</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">N/A</span>
+                                }
+                            </td>
+                            <td>@request.AppliedOn.ToString("dd MMM yyyy")</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <!-- Approve Button -->
+                                    <form method="post" asp-controller="ManagerDashboard" asp-action="ApproveRequest"
+                                          style="display:inline" class="approve-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@request.LeaveId" />
+                                        <input type="hidden" name="comments" value="" class="comments-input" />
+                                        <button type="button" class="btn btn-success approve-btn"
+                                                data-employee="@request.User?.FullName"
+                                                data-id="@request.LeaveId">
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                    </form>
+
+                                    <!-- Reject Button -->
+                                    <form method="post" asp-controller="ManagerDashboard" asp-action="RejectRequest"
+                                          style="display:inline" class="reject-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@request.LeaveId" />
+                                        <input type="hidden" name="comments" value="" class="comments-input" />
+                                        <button type="button" class="btn btn-danger reject-btn"
+                                                data-employee="@request.User?.FullName"
+                                                data-id="@request.LeaveId">
+                                            <i class="fas fa-times"></i> Reject
+                                        </button>
+                                    </form>
+
+                                    <!-- View Details Button -->
+                                    <a asp-controller="ManagerDashboard" asp-action="ViewRequest"
+                                       asp-route-id="@request.LeaveId" class="btn btn-info">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+            <h5>No pending requests</h5>
+            <p class="text-muted">All leave requests have been processed</p>
+            <a href="@Url.Action("Index", "ManagerDashboard")" class="btn btn-primary">
+                <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+            </a>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Auto-refresh every 30 seconds
+            setInterval(function() {
+                if (@pendingCount > 0) {
+                    location.reload();
+                }
+            }, 30000);
+
+            // Approve button click
+            $('.approve-btn').click(function() {
+                const employeeName = $(this).data('employee');
+                const leaveId = $(this).data('id');
+                const form = $(this).closest('.approve-form');
+
+                Swal.fire({
+                    title: 'Approve Leave Request',
+                    html: `
+                        <div class="text-start">
+                            <p>Are you sure you want to approve leave request for <strong>${employeeName}</strong>?</p>
+                            <div class="mt-3">
+                                <label class="form-label">Comments (Optional)</label>
+                                <textarea class="form-control" id="approveComments" rows="3"
+                                          placeholder="Add comments for the employee..."></textarea>
+                            </div>
+                        </div>
+                    `,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Approve',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#22c55e',
+                    preConfirm: () => {
+                        const comments = $('#approveComments').val();
+                        form.find('.comments-input').val(comments);
+                        return comments !== undefined;
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+
+            // Reject button click
+            $('.reject-btn').click(function() {
+                const employeeName = $(this).data('employee');
+                const leaveId = $(this).data('id');
+                const form = $(this).closest('.reject-form');
+
+                Swal.fire({
+                    title: 'Reject Leave Request',
+                    html: `
+                        <div class="text-start">
+                            <p>Are you sure you want to reject leave request for <strong>${employeeName}</strong>?</p>
+                            <div class="mt-3">
+                                <label class="form-label">Reason for Rejection *</label>
+                                <textarea class="form-control" id="rejectComments" rows="3"
+                                          placeholder="Please provide a reason for rejection..." required></textarea>
+                            </div>
+                        </div>
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Reject',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#ef4444',
+                    preConfirm: () => {
+                        const comments = $('#rejectComments').val();
+                        if (!comments) {
+                            Swal.showValidationMessage('Please provide a reason for rejection');
+                            return false;
+                        }
+                        form.find('.comments-input').val(comments);
+                        return comments;
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+    </script>
+
+    <style>
+        .avatar-circle-sm {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            background: var(--primary-accent);
+        }
+
+        .table-dark-theme {
+            background: var(--dark-surface);
+            color: var(--text-light);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+            .table-dark-theme thead th {
+                background: var(--darker-surface);
+                color: var(--text-light);
+                border-bottom: 1px solid var(--border-color);
+                padding: 15px;
+                font-weight: 600;
+            }
+
+            .table-dark-theme tbody td {
+                background: var(--dark-surface);
+                color: var(--text-light);
+                border-color: var(--border-color);
+                padding: 12px 15px;
+                vertical-align: middle;
+            }
+
+            .table-dark-theme tbody tr:hover td {
+                background: rgba(255, 255, 255, 0.03);
+            }
+
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .approve-form, .reject-form {
+            display: inline-block;
+        }
+    </style>
+}

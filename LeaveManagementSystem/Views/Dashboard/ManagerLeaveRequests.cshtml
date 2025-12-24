@@ -1,0 +1,534 @@
+﻿@model List<LeaveManagementSystem.Models.Entities.LeaveApplication>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Manager Leave Requests";
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-tie me-2"></i>Manager Leave Requests</h2>
+        <a href="@Url.Action("Admin", "Dashboard")" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Pending Requests</h6>
+                            <h3 class="mb-0">@Model.Count</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Total Days Requested</h6>
+                            <h3 class="mb-0">@Model.Sum(l => l.TotalDays)</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Managers</h6>
+                            <h3 class="mb-0">@Model.Select(l => l.UserId).Distinct().Count()</h3>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager Leaves Table -->
+    <div class="card">
+        <div class="card-body">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Manager</th>
+                                <th>Department</th>
+                                <th>Leave Type</th>
+                                <th>Duration</th>
+                                <th>Total Days</th>
+                                <th>Applied On</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var leave in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-placeholder bg-primary text-white rounded-circle me-2" style="width: 36px; height: 36px; line-height: 36px; text-align: center;">
+                                                @leave.User.FullName.Substring(0, 1).ToUpper()
+                                            </div>
+                                            <div>
+                                                <strong>@leave.User.FullName</strong><br />
+                                                <small class="text-muted">@leave.User.Email</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@leave.User.Department?.Name</td>
+                                    <td>
+                                        <span class="badge bg-secondary">@leave.LeaveType?.Name</span>
+                                    </td>
+                                    <td>
+                                        <small>@leave.StartDate.ToString("dd-MMM-yyyy")</small><br />
+                                        <small>to</small><br />
+                                        <small>@leave.EndDate.ToString("dd-MMM-yyyy")</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">@leave.TotalDays day(s)</span>
+                                    </td>
+                                    <td>@leave.AppliedOn.ToString("dd-MMM-yyyy hh:mm tt")</td>
+                                    <td>
+                                        @if (leave.Reason.Length > 50)
+                                        {
+                                            <span title="@leave.Reason">@leave.Reason.Substring(0, 50)...</span>
+                                        }
+                                        else
+                                        {
+                                            @leave.Reason
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="@Url.Action("ViewManagerLeaveRequest", "Dashboard", new { id = leave.LeaveId })"
+                                               class="btn btn-sm btn-outline-primary" title="View Details">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            @if (leave.Status == "Pending")
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-success"
+                                                        title="Approve"
+                                                        onclick="showApproveModal(@leave.LeaveId)">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        title="Reject"
+                                                        onclick="showRejectModal(@leave.LeaveId)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-user-check fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No pending manager leave requests</h5>
+                    <p class="text-muted">All manager leave requests have been processed.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Approve Leave Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="approveForm" method="post" action="@Url.Action("ApproveManagerLeave", "Dashboard")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="approveLeaveId" name="id" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="approveComments" class="form-label">Comments (Optional)</label>
+                        <textarea class="form-control" id="approveComments" name="comments" rows="3"
+                                  placeholder="Add any comments for the manager..."></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This will deduct leave balance from the manager's account.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Approve Leave</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Leave Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm" method="post" action="@Url.Action("RejectManagerLeave", "Dashboard")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="rejectLeaveId" name="id" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="rejectComments" class="form-label">Comments (Required)</label>
+                        <textarea class="form-control" id="rejectComments" name="comments" rows="3"
+                                  placeholder="Reason for rejecting the leave request..." required></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        This will notify the manager that their leave request has been rejected.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject Leave</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('.table').DataTable({
+                "order": [[5, "desc"]], // Sort by AppliedOn descending
+                "pageLength": 10,
+                "language": {
+                    "emptyTable": "No leave requests found",
+                    "info": "Showing _START_ to _END_ of _TOTAL_ requests",
+                    "infoEmpty": "Showing 0 to 0 of 0 requests",
+                    "infoFiltered": "(filtered from _MAX_ total requests)",
+                    "lengthMenu": "Show _MENU_ requests",
+                    "search": "Search:",
+                    "zeroRecords": "No matching leave requests found"
+                }
+            });
+        });
+
+        function showApproveModal(leaveId) {
+            $('#approveLeaveId').val(leaveId);
+            $('#approveComments').val('');
+            $('#approveModal').modal('show');
+        }
+
+        function showRejectModal(leaveId) {
+            $('#rejectLeaveId').val(leaveId);
+            $('#rejectComments').val('');
+            $('#rejectModal').modal('show');
+        }
+
+        $('#approveForm').submit(function(e) {
+            if (!confirm('Are you sure you want to approve this leave request?')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        $('#rejectForm').submit(function(e) {
+            if (!confirm('Are you sure you want to reject this leave request?')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+}
+<style>
+    .dashboard-container {
+        padding: 20px;
+        background: var(--dark-surface);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        margin: 20px 0;
+    }
+
+    .stat-card {
+        border: none;
+        border-radius: 8px;
+        transition: transform 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+    .stat-icon {
+        opacity: 0.8;
+    }
+
+    .avatar-placeholder {
+        font-weight: bold;
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    }
+
+    /* ✅ FIXED: Table styles for dark theme */
+    .table {
+        background: var(--darker-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+
+        .table thead th {
+            background: var(--primary-accent);
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+            .table tbody tr:hover {
+                background: rgba(59, 130, 246, 0.08) !important;
+            }
+
+                .table tbody tr:hover td {
+                    color: #e2e8f0 !important;
+                }
+
+        .table td {
+            border-color: var(--border-color);
+            vertical-align: middle;
+            padding: 12px 15px;
+        }
+
+    /* ✅ FIXED: Badge styles */
+    .badge {
+        padding: 0.5em 0.8em;
+        font-weight: 500;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bg-secondary {
+        background: linear-gradient(135deg, #64748b, #475569) !important;
+        color: white !important;
+    }
+
+    .bg-info {
+        background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;
+        color: white !important;
+    }
+
+    .bg-primary {
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    }
+
+    .bg-warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+        color: #1e293b !important;
+    }
+
+    .bg-success {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        color: white !important;
+    }
+
+    .bg-danger {
+        background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+        color: white !important;
+    }
+
+    /* ✅ FIXED: Button styles */
+    .btn-group .btn {
+        border-radius: 6px;
+        margin-right: 5px;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s;
+    }
+
+    .btn-outline-primary {
+        color: #3b82f6;
+        border-color: #3b82f6;
+    }
+
+        .btn-outline-primary:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+    .btn-outline-success {
+        color: #22c55e;
+        border-color: #22c55e;
+    }
+
+        .btn-outline-success:hover {
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e;
+        }
+
+    .btn-outline-danger {
+        color: #ef4444;
+        border-color: #ef4444;
+    }
+
+        .btn-outline-danger:hover {
+            background: #ef4444;
+            color: white;
+            border-color: #ef4444;
+        }
+
+    .btn-outline-secondary {
+        color: #94a3b8;
+        border-color: #475569;
+    }
+
+        .btn-outline-secondary:hover {
+            background: #475569;
+            color: white;
+            border-color: #475569;
+        }
+
+    /* ✅ FIXED: Text colors */
+    .text-muted {
+        color: #94a3b8 !important;
+    }
+
+    /* ✅ FIXED: Modal styles for dark theme */
+    .modal-content {
+        background: var(--dark-surface);
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+    }
+
+    .modal-header {
+        background: var(--darker-surface);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-footer {
+        background: var(--darker-surface);
+        border-top: 1px solid var(--border-color);
+    }
+
+    .form-control, .form-select {
+        background: var(--darker-surface);
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+    }
+
+        .form-control:focus, .form-select:focus {
+            background: var(--darker-surface);
+            color: var(--text-light);
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+        }
+
+    /* ✅ FIXED: Alert styles */
+    .alert-info {
+        background: rgba(14, 165, 233, 0.1);
+        border-color: rgba(14, 165, 233, 0.3);
+        color: #bae6fd;
+    }
+
+    .alert-warning {
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #fde68a;
+    }
+
+    .alert-success {
+        background: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+        color: #bbf7d0;
+    }
+
+    .alert-danger {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #fecaca;
+    }
+
+    /* ✅ FIXED: Card styles */
+    .card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+    }
+
+    .card-body {
+        color: var(--text-light);
+    }
+
+    /* ✅ FIXED: DataTable customization for dark theme */
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+        background: var(--darker-surface);
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        background: var(--dark-surface) !important;
+        color: var(--text-light) !important;
+        border: 1px solid var(--border-color) !important;
+    }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: var(--primary-accent) !important;
+            color: white !important;
+            border: 1px solid var(--primary-accent) !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: rgba(59, 130, 246, 0.2) !important;
+            color: var(--primary-accent) !important;
+        }
+</style>

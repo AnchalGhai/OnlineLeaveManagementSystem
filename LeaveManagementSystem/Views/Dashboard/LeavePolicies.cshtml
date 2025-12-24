@@ -1,0 +1,253 @@
+﻿@model List<LeaveManagementSystem.Models.Entities.LeaveType>
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Leave Policies";
+}
+
+<div class="dashboard-container">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-0"><i class="fas fa-file-contract me-2"></i>Leave Policies Management</h2>
+            <p class="text-muted mb-0">Manage all leave types and their annual limits</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a class="btn btn-primary" href="@Url.Action("ManageLeavePolicy", "Dashboard")">
+                <i class="fas fa-plus me-2"></i>Add New Leave Type
+            </a>
+            <a class="btn btn-secondary ms-2" href="@Url.Action("Admin", "Dashboard")">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="section-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5><i class="fas fa-list me-2"></i>Leave Policies List</h5>
+            <div class="search-container">
+                <div class="input-group" style="width: 300px;">
+                    <span class="input-group-text bg-transparent border-end-0">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0" id="policySearch"
+                           placeholder="Search policies...">
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            @if (!Model.Any())
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>No leave policies found. Add your first leave type to get started.
+                </div>
+            }
+            else
+            {
+                <table class="table table-dark-theme" id="leavePoliciesTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Leave Type</th>
+                            <th>Max Days Per Year</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var policy in Model)
+                        {
+                            <tr>
+                                <td>@policy.LeaveTypeId</td>
+                                <td>
+                                    <strong>@policy.Name</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary" style="font-size: 14px; padding: 8px 12px;">
+                                        <i class="fas fa-calendar-day me-1"></i>@policy.MaxPerYear days
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-warning" href="@Url.Action("ManageLeavePolicy", "Dashboard", new { id = policy.LeaveTypeId })"
+                                           title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="post" asp-action="DeleteLeavePolicy"
+                                              class="delete-form"
+                                              style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@policy.LeaveTypeId" />
+                                            <button type="submit" class="btn btn-danger delete-btn" title="Delete" data-policy-name="@policy.Name">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 30px;
+        background: var(--dark-surface);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        margin: 20px 0;
+    }
+
+    .table-dark-theme {
+        background: var(--darker-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+
+        .table-dark-theme thead th {
+            background: var(--primary-accent);
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 15px;
+        }
+
+        .table-dark-theme tbody tr {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+            .table-dark-theme tbody tr:hover {
+                background: rgba(59, 130, 246, 0.1);
+            }
+
+        .table-dark-theme td {
+            border-color: var(--border-color);
+            vertical-align: middle;
+            padding: 12px 15px;
+        }
+
+    .badge {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        font-weight: 500;
+    }
+
+    .btn-group-sm .btn {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .btn-danger:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Hide DataTable Controls */
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate,
+    .dataTables_wrapper .dataTables_filter {
+        display: none !important;
+    }
+
+    /* Custom Search Box Style - MyLeaves.cshtml style */
+    .search-container .input-group {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+        .search-container .input-group:focus-within {
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+    .search-container .input-group-text {
+        background: var(--darker-surface);
+        border: none;
+        color: var(--text-muted);
+    }
+
+    .search-container .form-control {
+        background: var(--darker-surface);
+        border: none;
+        box-shadow: none;
+        color: var(--text-light);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable WITHOUT any controls (like MyLeaves.cshtml)
+            const policiesTable = $('#leavePoliciesTable').DataTable({
+                pageLength: 1000, // Show all rows
+                order: [[0, 'desc']], // Sort by ID descending
+                responsive: true,
+                searching: true, // Enable searching
+                paging: false, // Disable pagination
+                info: false, // Hide "Showing X of Y entries"
+                lengthMenu: false, // Hide "Show X entries"
+                columnDefs: [
+                    { orderable: false, targets: [3] } // Disable sorting for Actions column
+                ],
+                language: {
+                    search: "", // Empty string to remove search label
+                    emptyTable: "No leave policies found"
+                },
+                // Remove all DataTable controls
+                dom: 't'
+            });
+
+            // Custom search for Policies table
+            $('#policySearch').on('keyup', function() {
+                policiesTable.search(this.value).draw();
+            });
+
+            // Auto-dismiss alerts after 5 seconds
+            setTimeout(function() {
+                $('.alert').alert('close');
+            }, 5000);
+        });
+
+        function confirmDelete(leaveTypeName) {
+            return Swal.fire({
+                title: 'Delete Leave Type?',
+                html: `Are you sure you want to delete <strong>${leaveTypeName}</strong>?<br><br>
+                      <span class="text-danger">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        This action cannot be undone.
+                      </span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel',
+                width: '500px'
+            }).then((result) => {
+                return result.isConfirmed;
+            });
+        }
+    </script>
+}

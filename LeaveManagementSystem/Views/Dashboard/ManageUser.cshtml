@@ -1,0 +1,475 @@
+﻿@model LeaveManagementSystem.Models.Entities.User
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="form-card">
+                <div class="form-header text-center mb-4">
+                    <h3 class="form-title">
+                        <i class="fas fa-user me-2"></i>
+                        @(Model.UserId == 0 ? "Add New User" : "Edit User")
+                    </h3>
+                    <p class="form-subtitle text-muted">
+                        @(Model.UserId == 0 ? "Create a new user account" : "Update user information")
+                    </p>
+                </div>
+
+                <form asp-action="ManageUser" asp-controller="Dashboard" method="post" class="needs-validation" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="UserId" />
+
+                    <!-- Personal Information -->
+                    <div class="form-section mb-4">
+                        <h5 class="section-title">
+                            <i class="fas fa-id-card me-2"></i>Personal Information
+                        </h5>
+
+                        <div class="mb-3">
+                            <label asp-for="FullName" class="form-label">Full Name</label>
+                            <input asp-for="FullName" class="form-control" placeholder="Enter full name" required />
+                            <span asp-validation-for="FullName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Email Address</label>
+                            <input asp-for="Email" type="email" class="form-control" placeholder="Enter email address" required />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Security -->
+                    <div class="form-section mb-4">
+                        <h5 class="section-title">
+                            <i class="fas fa-shield-alt me-2"></i>Security
+                        </h5>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">
+                                Password
+                                @if (Model.UserId == 0)
+                                {
+                                    <span class="text-danger">*</span>
+                                }
+                            </label>
+
+                            @if (Model.UserId == 0)
+                            {
+                                <input asp-for="Password" type="password" class="form-control"
+                                       placeholder="Enter password" required />
+                            }
+                            else
+                            {
+                                <input asp-for="Password" type="password" class="form-control"
+                                       placeholder="Leave blank to keep current password" />
+                            }
+
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label">Confirm Password</label>
+                            <input asp-for="ConfirmPassword" type="password" class="form-control"
+                                   placeholder="Confirm password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Role & Department -->
+                    <div class="form-section mb-4">
+                        <h5 class="section-title">
+                            <i class="fas fa-briefcase me-2"></i>Role & Department
+                        </h5>
+
+                        <div class="mb-3">
+                            <label asp-for="Role" class="form-label">User Role</label>
+                            <select asp-for="Role" class="form-select" asp-items="ViewBag.RoleList" id="roleSelect" required>
+                                <option value="">-- Select Role --</option>
+                            </select>
+                            <span asp-validation-for="Role" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3" id="departmentDiv">
+                            <label asp-for="DepartmentId" class="form-label">Department</label>
+                            <select asp-for="DepartmentId" class="form-select" asp-items="ViewBag.DepartmentList" id="DepartmentId">
+                                <option value="">-- Select Department --</option>
+                            </select>
+                            <span asp-validation-for="DepartmentId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3" id="managerDiv">
+                            <label asp-for="ManagerId" class="form-label">Manager</label>
+                            <select asp-for="ManagerId" class="form-select" id="ManagerId" disabled>
+                                <option value="">-- Select Department First --</option>
+                            </select>
+                            <small class="form-text text-muted" id="managerHelp">
+                                Please select a department first to see available managers
+                            </small>
+                            <span asp-validation-for="ManagerId" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Status (for existing users) -->
+                    @if (Model.UserId != 0)
+                    {
+                        <div class="form-section mb-4">
+                            <h5 class="section-title">
+                                <i class="fas fa-user-check me-2"></i>Status
+                            </h5>
+
+                            <div class="form-check form-switch">
+                                <input type="checkbox" asp-for="IsActive" class="form-check-input" role="switch" />
+                                <label class="form-check-label" asp-for="IsActive">Active User</label>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Form Actions -->
+                    <div class="form-actions mt-4">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                                    <i class="fas fa-save me-2"></i>
+                                    @(Model.UserId == 0 ? "Create User" : "Update User")
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-outline-secondary w-100" href="@Url.Action("Admin", "Dashboard")">
+                                    <i class="fas fa-times me-2"></i>Cancel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const roleSelect = document.getElementById('roleSelect');
+            const departmentSelect = document.getElementById('DepartmentId');
+            const managerSelect = document.getElementById('ManagerId');
+            const managerHelp = document.getElementById('managerHelp');
+            const departmentDiv = document.getElementById('departmentDiv');
+            const managerDiv = document.getElementById('managerDiv');
+            const submitBtn = document.getElementById('submitBtn');
+
+            // Function to toggle fields based on role
+            function toggleFields() {
+                const role = roleSelect.value;
+
+                if (role === 'Admin') {
+                    departmentDiv.style.display = 'none';
+                    managerDiv.style.display = 'none';
+                    managerSelect.innerHTML = '<option value="">Not applicable for Admin</option>';
+                    managerSelect.disabled = true;
+                    departmentSelect.required = false;
+                    departmentSelect.value = '';
+                } else if (role === 'Manager') {
+                    departmentDiv.style.display = 'block';
+                    managerDiv.style.display = 'none';
+                    managerSelect.innerHTML = '<option value="">Not applicable for Manager</option>';
+                    managerSelect.disabled = true;
+                    departmentSelect.required = true;
+                    // Clear any previous manager selection
+                    managerSelect.value = '';
+                } else if (role === 'Employee') {
+                    departmentDiv.style.display = 'block';
+                    managerDiv.style.display = 'block';
+                    managerSelect.disabled = true;
+                    departmentSelect.required = true;
+
+                    // Reset manager dropdown
+                    managerSelect.innerHTML = '<option value="">-- Select Department First --</option>';
+                    managerSelect.disabled = true;
+                    managerHelp.textContent = 'Please select a department first to see available managers';
+
+                    // Agar edit mode me hai aur department already select hai
+                    if (departmentSelect.value) {
+                        loadManagersByDepartment(departmentSelect.value);
+                    }
+                }
+            }
+
+            // Function to load managers by department
+            function loadManagersByDepartment(departmentId) {
+                if (!departmentId || departmentId === '') {
+                    managerSelect.innerHTML = '<option value="">-- Select Department First --</option>';
+                    managerSelect.disabled = true;
+                    managerSelect.value = '';
+                    managerHelp.textContent = 'Please select a department first to see available managers';
+                    return;
+                }
+
+                managerSelect.innerHTML = '<option value="">Loading managers...</option>';
+                managerSelect.disabled = true;
+                managerHelp.textContent = 'Loading managers...';
+
+                fetch(`/Dashboard/GetManagersByDepartment?departmentId=${departmentId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            if (data.managers && data.managers.length > 0) {
+                                // Clear and add options
+                                managerSelect.innerHTML = '';
+
+                                // Add default option
+                                const defaultOption = document.createElement('option');
+                                defaultOption.value = '';
+                                defaultOption.textContent = '-- Select Manager --';
+                                managerSelect.appendChild(defaultOption);
+
+                                // Add manager options
+                                data.managers.forEach(manager => {
+                                    const option = document.createElement('option');
+                                    option.value = manager.userId;
+                                    option.textContent = manager.fullName + (manager.email ? ` (${manager.email})` : '');
+                                    managerSelect.appendChild(option);
+                                });
+
+                                managerSelect.disabled = false;
+                                managerHelp.textContent = `Found ${data.managers.length} manager(s) in this department`;
+
+                                // Agar edit mode me hai aur pehle se manager select hai
+                                const currentManagerId = '@Model.ManagerId';
+                                if (currentManagerId && currentManagerId !== '0' && currentManagerId !== '') {
+                                    managerSelect.value = currentManagerId;
+                                }
+                            } else {
+                                managerSelect.innerHTML = '<option value="">No managers available in this department</option>';
+                                managerSelect.disabled = true;
+                                managerSelect.value = '';
+                                managerHelp.textContent = 'No active managers found in this department';
+                            }
+                        } else {
+                            managerSelect.innerHTML = '<option value="">Error loading managers</option>';
+                            managerSelect.disabled = true;
+                            managerSelect.value = '';
+                            managerHelp.textContent = 'Error: ' + (data.message || 'Unknown error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading managers:', error);
+                        managerSelect.innerHTML = '<option value="">Error loading managers</option>';
+                        managerSelect.disabled = true;
+                        managerSelect.value = '';
+                        managerHelp.textContent = 'Error loading managers. Please try again.';
+                    });
+            }
+
+            // Department change event
+            departmentSelect.addEventListener('change', function() {
+                if (roleSelect.value === 'Employee') {
+                    loadManagersByDepartment(this.value);
+                } else {
+                    managerSelect.innerHTML = '<option value="">-- Select Department First --</option>';
+                    managerSelect.disabled = true;
+                    managerSelect.value = '';
+                }
+            });
+
+            // Role change event
+            roleSelect.addEventListener('change', function() {
+                // Reset department and manager when role changes
+                if (this.value !== 'Employee') {
+                    departmentSelect.value = '';
+                    managerSelect.value = '';
+                }
+                toggleFields();
+            });
+
+            // Form validation
+            function initializeValidation() {
+                const forms = document.querySelectorAll('.needs-validation');
+                Array.from(forms).forEach(form => {
+                    form.addEventListener('submit', function(event) {
+                        if (!form.checkValidity()) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+
+                        // Additional custom validation for Employee role
+                        if (roleSelect.value === 'Employee') {
+                            // Department validation
+                            if (!departmentSelect.value) {
+                                event.preventDefault();
+                                departmentSelect.classList.add('is-invalid');
+                                const errorDiv = departmentSelect.nextElementSibling;
+                                if (errorDiv && errorDiv.classList.contains('text-danger')) {
+                                    errorDiv.textContent = 'Department is required for Employees';
+                                }
+                            }
+
+                            // Manager validation - only if dropdown is enabled
+                            if (managerSelect.disabled === false && !managerSelect.value) {
+                                event.preventDefault();
+                                managerSelect.classList.add('is-invalid');
+                                const errorDiv = managerSelect.nextElementSibling;
+                                if (errorDiv && errorDiv.classList.contains('text-danger')) {
+                                    errorDiv.textContent = 'Please select a manager';
+                                }
+                            }
+                        }
+                    }, false);
+                });
+            }
+
+            // Page load initialization
+            toggleFields();
+            initializeValidation();
+
+            // Agar edit mode me hai aur employee hai
+            if (roleSelect.value === 'Employee' && departmentSelect.value) {
+                setTimeout(() => {
+                    loadManagersByDepartment(departmentSelect.value);
+                }, 300);
+            }
+        });
+    </script>
+
+    <partial name="_ValidationScriptsPartial" />
+}
+
+<style>
+    .form-card {
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-header {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1rem;
+    }
+
+    .form-title {
+        color: var(--text-light);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-subtitle {
+        font-size: 0.9rem;
+        margin-bottom: 0;
+    }
+
+    .form-section {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        color: var(--text-light);
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .form-label {
+        color: var(--text-light);
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        background: var(--dark-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+        border-radius: 6px;
+        padding: 0.75rem;
+    }
+
+        .form-control:focus, .form-select:focus {
+            background: var(--dark-bg);
+            border-color: var(--primary-accent);
+            color: var(--text-light);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+    .form-check-input:checked {
+        background-color: var(--primary-accent);
+        border-color: var(--primary-accent);
+    }
+
+    .form-check-label {
+        color: var(--text-light);
+    }
+
+    .btn-primary {
+        background: var(--primary-accent);
+        border: none;
+        padding: 0.75rem;
+        font-weight: 500;
+        border-radius: 6px;
+    }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+    .btn-outline-secondary {
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 0.75rem;
+        font-weight: 500;
+        border-radius: 6px;
+    }
+
+        .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-light);
+            border-color: var(--text-muted);
+        }
+
+    .text-danger {
+        color: #ef4444 !important;
+        font-size: 0.875rem;
+    }
+
+    .form-text.text-muted {
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    /* Disabled state styling */
+    select:disabled {
+        background-color: rgba(255, 255, 255, 0.1);
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .container-fluid {
+            padding: 1rem;
+        }
+
+        .form-card {
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        .form-section {
+            padding: 1rem;
+        }
+    }
+</style>

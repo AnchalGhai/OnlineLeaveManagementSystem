@@ -1,0 +1,739 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using LeaveManagementSystem.Models
+@inject DatabaseContext _context
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    // Check session
+    var managerId = Context.Session.GetInt32("UserId") ?? 0;
+    var managerName = Context.Session.GetString("UserName") ?? "Manager";
+    var role = Context.Session.GetString("Role");
+    var departmentId = Context.Session.GetString("DepartmentId");
+
+    // Redirect if not manager
+    if (role != "Manager")
+    {
+        Context.Response.Redirect("/Home/Index");
+        return;
+    }
+
+    // Database se data fetch karo
+    var teamMembers = await _context.Users
+        .Include(u => u.Department)
+        .Where(u => u.ManagerId == managerId && u.IsActive)
+        .OrderBy(u => u.FullName)
+        .ToListAsync();
+
+    var pendingRequests = await _context.LeaveApplications
+        .Include(l => l.User)
+        .Include(l => l.LeaveType)
+        .Where(l => l.User.ManagerId == managerId && l.Status == "Pending")
+        .OrderBy(l => l.AppliedOn)
+        .ToListAsync();
+
+    var approvedThisMonth = await _context.LeaveApplications
+        .CountAsync(l => l.User.ManagerId == managerId &&
+                       l.Status == "Approved" &&
+                       l.ActionDate.HasValue &&
+                       l.ActionDate.Value.Month == DateTime.Now.Month &&
+                       l.ActionDate.Value.Year == DateTime.Now.Year);
+
+    // Calculate average processing time
+    var processedLeaves = await _context.LeaveApplications
+        .Where(l => l.User.ManagerId == managerId &&
+                   l.Status != "Pending" &&
+                   l.ActionDate.HasValue)
+        .ToListAsync();
+
+    var avgProcessingTime = processedLeaves.Any() ?
+        processedLeaves.Average(l => (l.ActionDate.Value - l.AppliedOn).TotalDays).ToString("0.0") : "0";
+
+    // Get recent approvals
+    var recentApprovals = await _context.LeaveApplications
+        .Include(l => l.User)
+        .Include(l => l.LeaveType)
+        .Where(l => l.User.ManagerId == managerId &&
+                   l.Status == "Approved" &&
+                   l.ActionDate.HasValue)
+        .OrderByDescending(l => l.ActionDate)
+        .Take(5)
+        .ToListAsync();
+
+    // Get notifications
+    var notifications = await _context.Notifications
+        .Where(n => n.UserId == managerId && !n.IsRead)
+        .OrderByDescending(n => n.CreatedOn)
+        .Take(10)
+        .ToListAsync();
+}
+
+<div class="dashboard-container">
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Welcome Section -->
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-2"><i class="fas fa-user-tie me-2"></i>Manager Dashboard</h2>
+            <p class="text-muted mb-0">
+                <i class="fas fa-user me-1"></i> Welcome, @managerName
+                @if (!string.IsNullOrEmpty(departmentId))
+                {
+                    var dept = await _context.Departments.FindAsync(int.Parse(departmentId));
+                    if (dept != null)
+                    {
+                        <span> | <i class="fas fa-building me-1"></i> @dept.Name</span>
+                    }
+                }
+                | <i class="fas fa-users me-1"></i> Team Size: @teamMembers.Count
+            </p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards - Now 3 in a row with equal spacing -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-primary"><i class="fas fa-users"></i></div>
+                <h3 class="mb-2">@teamMembers.Count</h3>
+                <p class="text-muted mb-0">Team Members</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-warning"><i class="fas fa-hourglass-half"></i></div>
+                <h3 class="mb-2">@pendingRequests.Count</h3>
+                <p class="text-muted mb-0">Pending Requests</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-success"><i class="fas fa-calendar-check"></i></div>
+                <h3 class="mb-2">@approvedThisMonth</h3>
+                <p class="text-muted mb-0">Approved This Month</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions - First Row (4 buttons) -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <button class="btn btn-action w-100 h-100" data-bs-toggle="collapse" data-bs-target="#pendingRequestsSection">
+                <i class="fas fa-hourglass-half me-2"></i>Pending Requests
+                <span class="badge bg-danger ms-2">@pendingRequests.Count</span>
+            </button>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a class="btn btn-action w-100 h-100" href="@Url.Action("ApplyLeave", "ManagerDashboard")">
+                <i class="fas fa-calendar-plus me-2"></i>Apply Leave
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a class="btn btn-action w-100 h-100" href="@Url.Action("MyLeaves", "ManagerDashboard")">
+                <i class="fas fa-calendar-alt me-2"></i>My Leaves
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a class="btn btn-action w-100 h-100" href="@Url.Action("TeamMembers", "ManagerDashboard")">
+                <i class="fas fa-users me-2"></i>Team Details
+            </a>
+        </div>
+    </div>
+
+    <!-- Additional Management Buttons - Second Row (4 buttons) -->
+    <div class="row g-3 mb-5">
+        <div class="col-lg-3 col-md-6">
+            <button class="btn btn-action w-100 h-100" data-bs-toggle="collapse" data-bs-target="#recentApprovalsSection">
+                <i class="fas fa-check-circle me-2"></i>Recent Approvals
+                @if (recentApprovals.Count > 0)
+                {
+                    <span class="badge bg-success ms-2">@recentApprovals.Count</span>
+                }
+            </button>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a class="btn btn-action w-100 h-100" href="@Url.Action("TeamCalendar", "ManagerDashboard")">
+                <i class="fas fa-calendar-alt me-2"></i>Team Calendar
+            </a>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <a class="btn btn-action w-100 h-100" href="@Url.Action("TeamReports", "ManagerDashboard")">
+                <i class="fas fa-chart-bar me-2"></i>Team Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+            <!-- Pending Requests Section -->
+            <div class="collapse show" id="pendingRequestsSection">
+                <div class="section-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="fas fa-hourglass-half me-2 text-warning"></i>Pending Leave Requests</h4>
+                        <span class="badge bg-warning">@pendingRequests.Count requests</span>
+                    </div>
+
+                    @if (pendingRequests.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-dark-theme">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Leave Type</th>
+                                        <th>Date Range</th>
+                                        <th>Days</th>
+                                        <th>Reason</th>
+                                        <th>Applied On</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var request in pendingRequests)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-circle-sm bg-primary me-2">
+                                                        @request.User?.FullName?[0]
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">@request.User?.FullName</div>
+                                                        <small class="text-muted">@request.User?.Email</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">@request.LeaveType?.Name</span>
+                                            </td>
+                                            <td>
+                                                <div>@request.StartDate.ToString("dd MMM")</div>
+                                                <small class="text-muted">to @request.EndDate.ToString("dd MMM yyyy")</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">@request.TotalDays days</span>
+                                            </td>
+                                            <td>@(string.IsNullOrEmpty(request.Reason) ? "N/A" : request.Reason)</td>
+                                            <td>@request.AppliedOn.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <!-- Approve Button -->
+                                                    <form method="post" asp-controller="ManagerDashboard" asp-action="ApproveRequest"
+                                                          style="display:inline" class="approve-form">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@request.LeaveId" />
+                                                        <input type="hidden" name="comments" value="" class="comments-input" />
+                                                        <button type="button" class="btn btn-success approve-btn"
+                                                                data-employee="@request.User?.FullName"
+                                                                data-id="@request.LeaveId">
+                                                            <i class="fas fa-check"></i> Approve
+                                                        </button>
+                                                    </form>
+
+                                                    <!-- Reject Button -->
+                                                    <form method="post" asp-controller="ManagerDashboard" asp-action="RejectRequest"
+                                                          style="display:inline" class="reject-form">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@request.LeaveId" />
+                                                        <input type="hidden" name="comments" value="" class="comments-input" />
+                                                        <button type="button" class="btn btn-danger reject-btn"
+                                                                data-employee="@request.User?.FullName"
+                                                                data-id="@request.LeaveId">
+                                                            <i class="fas fa-times"></i> Reject
+                                                        </button>
+                                                    </form>
+
+                                                    <!-- View Details Button -->
+                                                    <a asp-controller="ManagerDashboard" asp-action="ViewRequest"
+                                                       asp-route-id="@request.LeaveId" class="btn btn-info">
+                                                        <i class="fas fa-eye"></i> Details
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <h5>No pending requests</h5>
+                            <p class="text-muted">All leave requests are processed</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Approvals Section -->
+            <div class="collapse" id="recentApprovalsSection">
+                <div class="section-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="fas fa-check-circle me-2 text-success"></i>Recent Approvals</h4>
+                        <span class="badge bg-success">@recentApprovals.Count approvals</span>
+                    </div>
+
+                    @if (recentApprovals.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-dark-theme">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Leave Type</th>
+                                        <th>Date Range</th>
+                                        <th>Days</th>
+                                        <th>Approved On</th>
+                                        <th>Comments</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var approval in recentApprovals)
+                                    {
+                                        <tr>
+                                            <td>@approval.User?.FullName</td>
+                                            <td><span class="badge bg-info">@approval.LeaveType?.Name</span></td>
+                                            <td>
+                                                <div>@approval.StartDate.ToString("dd MMM")</div>
+                                                <small class="text-muted">to @approval.EndDate.ToString("dd MMM yyyy")</small>
+                                            </td>
+                                            <td><span class="badge bg-secondary">@approval.TotalDays days</span></td>
+                                            <td>@approval.ActionDate?.ToString("dd MMM yyyy HH:mm")</td>
+                                            <td>@(string.IsNullOrEmpty(approval.ManagerComments) ? "N/A" : approval.ManagerComments)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-3">
+                            <i class="fas fa-check-circle fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No recent approvals</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+            <!-- Notifications Section -->
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-bell me-2 text-primary"></i>Notifications</h5>
+                    @if (notifications.Any())
+                    {
+                        <span id="notificationBadge" class="badge bg-primary">@notifications.Count new</span>
+                    }
+                </div>
+
+                <div class="notification-list">
+                    @if (notifications.Any())
+                    {
+                        @foreach (var notification in notifications)
+                        {
+                            <div class="notification-item @(!notification.IsRead ? "unread" : "")" id="notification-@notification.NotificationId">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="notification-content">
+                                        <p class="mb-1">@notification.Message</p>
+                                        <small class="text-muted">@notification.CreatedOn.ToString("hh:mm tt, dd MMM")</small>
+                                    </div>
+                                    @if (!notification.IsRead)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-primary mark-read-btn"
+                                                onclick="markNotificationAsRead(@notification.NotificationId, this)">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-3">
+                            <i class="fas fa-bell-slash fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No new notifications</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Updated CSS for better spacing and alignment -->
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+
+    /* Statistics Cards - Equal spacing */
+    .dashboard-card {
+        padding: 1.5rem;
+        border-radius: 10px;
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        transition: transform 0.3s, box-shadow 0.3s;
+        height: 100%;
+        min-height: 180px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-color: var(--primary-accent);
+        }
+
+        .dashboard-card .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+            .dashboard-card .feature-icon.text-primary {
+                color: #3b82f6;
+            }
+
+            .dashboard-card .feature-icon.text-warning {
+                color: #f59e0b;
+            }
+
+            .dashboard-card .feature-icon.text-success {
+                color: #22c55e;
+            }
+
+            .dashboard-card .feature-icon.text-info {
+                color: #0ea5e9;
+            }
+
+    /* Action Buttons - Fixed height and proper alignment */
+    .btn-action {
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+        padding: 15px 10px;
+        border-radius: 10px;
+        font-weight: 500;
+        transition: all 0.3s;
+        text-align: center;
+        width: 100%;
+        height: 100%;
+        min-height: 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border: none;
+    }
+
+        .btn-action:hover, .btn-action[aria-expanded="true"] {
+            background: var(--primary-accent);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-action i {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .btn-action .badge {
+            margin-top: 5px;
+            font-size: 0.7rem;
+        }
+
+    /* Section Cards */
+    .section-card {
+        background: var(--dark-surface);
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        margin-bottom: 1rem;
+    }
+
+    /* Avatar Circles */
+    .avatar-circle-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        background: var(--primary-accent);
+    }
+
+    /* Notifications */
+    .notification-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.3s;
+    }
+
+        .notification-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .notification-item.unread {
+            background: rgba(59, 130, 246, 0.05);
+            border-left: 3px solid var(--primary-accent);
+        }
+
+    .notification-content {
+        flex: 1;
+        margin-right: 10px;
+    }
+
+    .mark-read-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    /* Quick Tips */
+    .quick-tips-list {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .tip-item {
+        padding: 0.75rem;
+        border-radius: 6px;
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s;
+    }
+
+        .tip-item:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-1px);
+        }
+
+    /* Table Styles */
+    .table-dark-theme {
+        background: var(--dark-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+        .table-dark-theme thead th {
+            background: var(--darker-surface);
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-dark-theme tbody td {
+            background: var(--dark-surface);
+            color: var(--text-light);
+            border-color: var(--border-color);
+            padding: 12px 15px;
+            vertical-align: middle;
+        }
+
+        .table-dark-theme tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--dark-surface);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 3px;
+    }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-accent);
+        }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .dashboard-card {
+            min-height: 150px;
+            padding: 1rem;
+        }
+
+        .btn-action {
+            min-height: 70px;
+            padding: 10px;
+        }
+
+        .dashboard-container {
+            padding: 15px;
+        }
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        $(document).ready(function() {
+            // Auto-open pending requests section if there are pending requests
+            @if (pendingRequests.Count > 0)
+            {
+                    <text>$('#pendingRequestsSection').collapse('show');</text>
+            }
+
+            // Mark notification as read function
+            function markNotificationAsRead(notificationId, button) {
+                $.ajax({
+                    url: '@Url.Action("MarkNotificationAsRead", "ManagerDashboard")',
+                    type: 'GET',
+                    data: { id: notificationId },
+                    success: function(response) {
+                        if (response.success) {
+                            var notificationItem = $(button).closest('.notification-item');
+                            notificationItem.removeClass('unread');
+                            $(button).remove();
+
+                            // Update notification count
+                            var badge = $('#notificationBadge');
+                            if (badge.length) {
+                                var count = parseInt(badge.text());
+                                if (count > 1) {
+                                    badge.text(count - 1);
+                                } else {
+                                    badge.remove();
+                                }
+                            }
+                        }
+                    },
+                    error: function() {
+                        console.error('Failed to mark notification as read');
+                    }
+                });
+            }
+
+            // Attach mark as read function to buttons
+            $('.mark-read-btn').click(function() {
+                var notificationId = $(this).attr('onclick').match(/\d+/)[0];
+                markNotificationAsRead(notificationId, this);
+            });
+
+            // Approve button click
+            $('.approve-btn').click(function() {
+                const employeeName = $(this).data('employee');
+                const leaveId = $(this).data('id');
+                const form = $(this).closest('.approve-form');
+
+                Swal.fire({
+                    title: 'Approve Leave Request',
+                    html: `
+                        <div class="text-start">
+                            <p>Are you sure you want to approve leave request for <strong>${employeeName}</strong>?</p>
+                            <div class="mt-3">
+                                <label class="form-label">Comments (Optional)</label>
+                                <textarea class="form-control" id="approveComments" rows="3"
+                                          placeholder="Add comments for the employee..."></textarea>
+                            </div>
+                        </div>
+                    `,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Approve',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#22c55e',
+                    preConfirm: () => {
+                        const comments = $('#approveComments').val();
+                        form.find('.comments-input').val(comments);
+                        return comments !== undefined;
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+
+            // Reject button click
+            $('.reject-btn').click(function() {
+                const employeeName = $(this).data('employee');
+                const leaveId = $(this).data('id');
+                const form = $(this).closest('.reject-form');
+
+                Swal.fire({
+                    title: 'Reject Leave Request',
+                    html: `
+                        <div class="text-start">
+                            <p>Are you sure you want to reject leave request for <strong>${employeeName}</strong>?</p>
+                            <div class="mt-3">
+                                <label class="form-label">Reason for Rejection *</label>
+                                <textarea class="form-control" id="rejectComments" rows="3"
+                                          placeholder="Please provide a reason for rejection..." required></textarea>
+                            </div>
+                        </div>
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Reject',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#ef4444',
+                    preConfirm: () => {
+                        const comments = $('#rejectComments').val();
+                        if (!comments) {
+                            Swal.showValidationMessage('Please provide a reason for rejection');
+                            return false;
+                        }
+                        form.find('.comments-input').val(comments);
+                        return comments;
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+
+            // Auto-refresh every 60 seconds
+            setInterval(function() {
+                if ($('#pendingRequestsSection').hasClass('show') && @pendingRequests.Count > 0) {
+                    location.reload();
+                }
+            }, 60000);
+        });
+    </script>
+}

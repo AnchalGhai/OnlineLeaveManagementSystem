@@ -1,0 +1,615 @@
+﻿@model List<LeaveManagementSystem.Models.Entities.LeaveApplication>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "My Leave Applications";
+
+    // Calculate statistics
+    var totalLeaves = Model.Count;
+    var pendingLeaves = Model.Count(l => l.Status == "Pending");
+    var approvedLeaves = Model.Count(l => l.Status == "Approved");
+    var rejectedLeaves = Model.Count(l => l.Status == "Rejected");
+    var cancelledLeaves = Model.Count(l => l.Status == "Cancelled");
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-calendar-alt me-2"></i>My Leave Applications</h2>
+        <div class="d-flex gap-2">
+            <a href="@Url.Action("Index", "ManagerDashboard")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+            <a href="@Url.Action("ApplyLeave", "ManagerDashboard")" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Apply New Leave
+            </a>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-lg-6">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Total Leaves</h6>
+                        <h3 class="mb-0">@totalLeaves</h3>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-calendar-day text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-6">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Pending</h6>
+                        <h3 class="mb-0">@pendingLeaves</h3>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-clock text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-6">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Approved</h6>
+                        <h3 class="mb-0">@approvedLeaves</h3>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-check-circle text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-lg-6">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-2">Rejected</h6>
+                        <h3 class="mb-0">@rejectedLeaves</h3>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-times-circle text-danger"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="section-card mb-4">
+        <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Leaves</h5>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="leaveTypeFilter">
+                    <option value="">All Leave Types</option>
+                    @foreach (var leaveType in Model.Select(l => l.LeaveType?.Name).Distinct().Where(t => t != null))
+                    {
+                        <option value="@leaveType">@leaveType</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="month" class="form-control" id="monthFilter" value="@DateTime.Now.ToString("yyyy-MM")">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-secondary w-100" id="resetFilters">
+                    <i class="fas fa-sync-alt me-1"></i>Reset Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaves Table -->
+    <div class="section-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5><i class="fas fa-list me-2"></i>Leave Applications</h5>
+            <!-- Custom Search Box -->
+            <div class="search-container">
+                <div class="input-group" style="width: 300px;">
+                    <span class="input-group-text bg-transparent border-end-0">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0" id="customSearch" placeholder="Search leaves...">
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-dark-theme" id="leavesTable">
+                    <thead>
+                        <tr>
+                            <th>Leave Type</th>
+                            <th>Date Range</th>
+                            <th>Duration</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Applied On</th>
+                            <th>Manager Comments</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var leave in Model)
+                        {
+                            <tr data-status="@leave.Status"
+                                data-leavetype="@leave.LeaveType?.Name"
+                                data-month="@leave.StartDate.ToString("yyyy-MM")">
+                                <td>
+                                    <span class="badge bg-info">@leave.LeaveType?.Name</span>
+                                </td>
+                                <td>
+                                    <div class="fw-medium">@leave.StartDate.ToString("dd MMM yyyy")</div>
+                                    <small class="text-muted">to @leave.EndDate.ToString("dd MMM yyyy")</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">@leave.TotalDays day(s)</span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(leave.Reason))
+                                    {
+                                        <span class="text-truncate d-inline-block" style="max-width: 150px;"
+                                              title="@leave.Reason">@leave.Reason</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @(leave.Status == "Approved" ? "bg-success" :
+                                                                                                                                                                                                                                leave.Status == "Pending" ? "bg-warning" :
+                                                                                                                                                                                                                                leave.Status == "Rejected" ? "bg-danger" : "bg-secondary")">
+                                @leave.Status
+                            </span>
+                        </td>
+                        <td>@leave.AppliedOn.ToString("dd MMM yyyy HH:mm")</td>
+                        <td>
+                            <!-- Manager Comments: Sirf Approved ya Rejected ke liye show karein -->
+                            @if (leave.Status == "Approved" || leave.Status == "Rejected")
+                                    {
+                                        if (!string.IsNullOrEmpty(leave.ManagerComments))
+                                        {
+                                            <span class="text-muted" title="@leave.ManagerComments">
+                                                @(leave.ManagerComments.Length > 30 ? leave.ManagerComments.Substring(0, 30) + "..." : leave.ManagerComments)
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <!-- Pending aur Cancelled ke liye "-" -->
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <!-- Sirf Pending status ke liye Cancel button -->
+                                    @if (leave.Status == "Pending")
+                                    {
+                                        <form method="post" action="@Url.Action("CancelLeave", "ManagerDashboard")"
+                                              style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@leave.LeaveId" />
+                                            <button type="submit" class="btn btn-sm btn-danger"
+                                                    onclick="return confirm('Are you sure you want to cancel this leave application?')">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <!-- Approved, Rejected, Cancelled ke liye sirf "-" -->
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <div class="empty-state">
+                    <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
+                    <h5>No Leave Applications Found</h5>
+                    <p class="text-muted mb-4">You haven't applied for any leaves yet</p>
+                    <a href="@Url.Action("ApplyLeave", "ManagerDashboard")" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Apply for Leave
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+
+    .dashboard-card {
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+
+        .dashboard-card:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .dashboard-card .feature-icon {
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+
+    .section-card {
+        background: var(--dark-surface);
+        border-radius: 10px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .table-dark-theme {
+        background: var(--dark-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+
+        .table-dark-theme thead th {
+            background: var(--darker-surface);
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-dark-theme tbody td {
+            background: var(--dark-surface);
+            color: var(--text-light);
+            border-color: var(--border-color);
+            padding: 12px 15px;
+            vertical-align: middle;
+        }
+
+        .table-dark-theme tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+    .badge {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        font-weight: 500;
+        border-radius: 20px;
+    }
+
+    .bg-success {
+        background-color: #22c55e !important;
+    }
+
+    .bg-warning {
+        background-color: #f59e0b !important;
+    }
+
+    .bg-danger {
+        background-color: #ef4444 !important;
+    }
+
+    .bg-info {
+        background-color: #0ea5e9 !important;
+    }
+
+    .bg-secondary {
+        background-color: #64748b !important;
+    }
+
+    .btn-primary {
+        background: var(--primary-accent);
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+    .btn-outline-secondary {
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 10px 20px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+        .btn-outline-secondary:hover {
+            background: var(--dark-surface);
+            color: var(--text-light);
+            border-color: var(--text-muted);
+        }
+
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 0 2px;
+        padding: 6px 12px;
+    }
+
+    .form-control, .form-select {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+        border-radius: 8px;
+        padding: 10px 15px;
+    }
+
+        .form-control:focus, .form-select:focus {
+            background: var(--darker-surface);
+            border-color: var(--primary-accent);
+            color: var(--text-light);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+    .alert {
+        border: 1px solid;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .alert-success {
+        background-color: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+        color: #22c55e;
+    }
+
+    .alert-danger {
+        background-color: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+    }
+
+    .empty-state {
+        padding: 3rem 0;
+    }
+
+        .empty-state i {
+            opacity: 0.5;
+        }
+
+    /* Custom Search Box */
+    .search-container .input-group {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+        .search-container .input-group:focus-within {
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+    .search-container .input-group-text {
+        background: var(--darker-surface);
+        border: none;
+        color: var(--text-muted);
+    }
+
+    .search-container .form-control {
+        background: var(--darker-surface);
+        border: none;
+        box-shadow: none;
+    }
+
+    /* Hide all DataTable controls */
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate,
+    .dataTables_wrapper .dataTables_filter {
+        display: none !important;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-container {
+            padding: 15px;
+        }
+
+        .section-card {
+            padding: 1.5rem;
+        }
+
+        .dashboard-card {
+            padding: 1.2rem;
+        }
+
+        .d-flex {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+            .d-flex.justify-content-between {
+                align-items: flex-start;
+            }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+
+        form.d-inline {
+            display: inline !important;
+        }
+
+        .search-container .input-group {
+            width: 100% !important;
+            margin-top: 10px;
+        }
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Initialize DataTable WITHOUT any controls but WITH search enabled
+            const table = $('#leavesTable').DataTable({
+                pageLength: 1000, // Show all rows
+                order: [[5, 'desc']], // Sort by AppliedOn descending
+                responsive: true,
+                searching: true, // ENABLE searching for DataTable
+                paging: false, // Disable pagination
+                info: false, // Hide "Showing X of Y entries"
+                lengthMenu: false, // Hide "Show X entries"
+                columnDefs: [
+                    { orderable: false, targets: [7] } // Disable sorting for Actions column
+                ],
+                language: {
+                    search: "", // Empty string to remove search label
+                    emptyTable: "No leave applications found"
+                },
+                // Remove all DataTable controls except table
+                dom: 't'
+            });
+
+            // Custom search functionality - Binds to DataTable's search
+            $('#customSearch').on('keyup', function() {
+                console.log('Searching for:', this.value);
+                table.search(this.value).draw();
+            });
+
+            // Filter functionality
+            $('#statusFilter, #leaveTypeFilter, #monthFilter').change(function() {
+                applyCustomFilters();
+            });
+
+            $('#resetFilters').click(function() {
+                $('#statusFilter').val('');
+                $('#leaveTypeFilter').val('');
+                $('#monthFilter').val('@DateTime.Now.ToString("yyyy-MM")');
+                $('#customSearch').val(''); // Clear search
+                table.search('').draw(); // Clear DataTable search
+                applyCustomFilters();
+            });
+
+            function applyCustomFilters() {
+                const status = $('#statusFilter').val().toLowerCase();
+                const leaveType = $('#leaveTypeFilter').val();
+                const month = $('#monthFilter').val();
+
+                // Custom filtering
+                $.fn.dataTable.ext.search.push(
+                    function(settings, data, dataIndex) {
+                        const row = table.row(dataIndex).node();
+                        const rowStatus = $(row).data('status').toLowerCase();
+                        const rowLeaveType = $(row).data('leavetype');
+                        const rowMonth = $(row).data('month');
+
+                        let showRow = true;
+
+                        if (status && rowStatus !== status) {
+                            showRow = false;
+                        }
+
+                        if (leaveType && rowLeaveType !== leaveType) {
+                            showRow = false;
+                        }
+
+                        if (month && rowMonth !== month) {
+                            showRow = false;
+                        }
+
+                        return showRow;
+                    }
+                );
+
+                table.draw();
+
+                // Remove the filter function after applying
+                $.fn.dataTable.ext.search.pop();
+            }
+
+            // Auto-refresh every 30 seconds if there are pending leaves
+            setInterval(function() {
+                const pendingRows = $('tr[data-status="Pending"]:visible');
+                if (pendingRows.length > 0) {
+                    console.log('Auto-refreshing for pending leaves...');
+                    location.reload();
+                }
+            }, 30000);
+
+            // Tooltip for reason and comments
+            $('[title]').tooltip({
+                placement: 'top',
+                trigger: 'hover'
+            });
+
+            // Cancel button confirmation and loading
+            $(document).on('submit', 'form[action*="CancelLeave"]', function(e) {
+                if (!confirm('Are you sure you want to cancel this leave application?')) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                // Loading state
+                const button = $(this).find('button[type="submit"]');
+                button.html('<i class="fas fa-spinner fa-spin"></i>');
+                button.prop('disabled', true);
+            });
+        });
+    </script>
+}

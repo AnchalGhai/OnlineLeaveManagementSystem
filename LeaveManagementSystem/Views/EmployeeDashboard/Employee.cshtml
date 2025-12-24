@@ -1,0 +1,837 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using LeaveManagementSystem.Models
+@inject DatabaseContext _context
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    // Check session
+    var userId = Context.Session.GetInt32("UserId") ?? 0;
+    var userName = Context.Session.GetString("UserName") ?? "Employee";
+    var role = Context.Session.GetString("Role");
+
+    // Redirect if not employee
+    if (role != "Employee")
+    {
+        Context.Response.Redirect("/Home/Index");
+        return;
+    }
+
+    // Fetch data from database
+    var myLeaves = await _context.LeaveApplications
+        .Include(l => l.LeaveType)
+        .Where(l => l.UserId == userId)
+        .OrderByDescending(l => l.AppliedOn)
+        .ToListAsync();
+
+    var pendingLeaves = myLeaves.Count(l => l.Status == "Pending");
+    var approvedLeaves = myLeaves.Count(l => l.Status == "Approved");
+    var rejectedLeaves = myLeaves.Count(l => l.Status == "Rejected");
+
+    // Get leave balances
+    var leaveBalances = await _context.LeaveBalances
+        .Include(lb => lb.LeaveType)
+        .Where(lb => lb.UserId == userId)
+        .OrderBy(lb => lb.LeaveType.Name)
+        .ToListAsync();
+
+    // Get recent notifications
+    var notifications = await _context.Notifications
+        .Where(n => n.UserId == userId)
+        .OrderByDescending(n => n.CreatedOn)
+        .Take(10)
+        .ToListAsync();
+
+    // Get upcoming approved leaves
+    var upcomingLeaves = await _context.LeaveApplications
+        .Include(l => l.LeaveType)
+        .Where(l => l.UserId == userId &&
+                   l.Status == "Approved" &&
+                   l.StartDate >= DateTime.Now)
+        .OrderBy(l => l.StartDate)
+        .Take(5)
+        .ToListAsync();
+
+    // Get employee details
+    var employee = await _context.Users
+        .Include(u => u.Manager)
+        .Include(u => u.Department)
+        .FirstOrDefaultAsync(u => u.UserId == userId);
+
+    // Get current month leaves
+    var currentMonth = DateTime.Now.Month;
+    var currentYear = DateTime.Now.Year;
+    var leavesThisMonth = myLeaves.Count(l =>
+        l.StartDate.Month == currentMonth &&
+        l.StartDate.Year == currentYear);
+
+    // Calculate total leave days used this year
+    var totalLeaveDaysThisYear = myLeaves
+        .Where(l => l.Status == "Approved" && l.StartDate.Year == currentYear)
+        .Sum(l => l.TotalDays);
+}
+
+<div class="dashboard-container">
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Welcome Section -->
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-2"><i class="fas fa-user me-2"></i>Welcome, @userName</h2>
+            <p class="text-muted mb-0">
+                @if (employee?.Department != null)
+                {
+                    <i class="fas fa-building me-1"></i>
+                    @employee.Department.Name
+                }
+                @if (employee?.Manager != null)
+                {
+                    <span> | <i class="fas fa-user-tie me-1"></i> Manager: @employee.Manager.FullName</span>
+                }
+                | <i class="fas fa-calendar-alt me-1"></i> Leaves This Month: @leavesThisMonth
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <a href="@Url.Action("ApplyLeave", "EmployeeDashboard")" class="btn btn-primary me-2">
+                    <i class="fas fa-plus me-1"></i>Apply Leave
+                </a>
+                <a href="@Url.Action("MyLeaves", "EmployeeDashboard")" class="btn btn-secondary">
+                    <i class="fas fa-history me-1"></i>My Leaves
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon"><i class="fas fa-calendar-check"></i></div>
+                <h3 class="mb-2">@myLeaves.Count</h3>
+                <p class="text-muted mb-0">Total Leaves</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-warning"><i class="fas fa-clock"></i></div>
+                <h3 class="mb-2">@pendingLeaves</h3>
+                <p class="text-muted mb-0">Pending</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-success"><i class="fas fa-check-circle"></i></div>
+                <h3 class="mb-2">@approvedLeaves</h3>
+                <p class="text-muted mb-0">Approved</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-danger"><i class="fas fa-times-circle"></i></div>
+                <h3 class="mb-2">@rejectedLeaves</h3>
+                <p class="text-muted mb-0">Rejected</p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+            <!-- Leave Balance Section -->
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="fas fa-chart-pie me-2"></i>My Leave Balance</h4>
+                    <span class="badge bg-info">@currentYear</span>
+                </div>
+
+                @if (leaveBalances.Any())
+                {
+                    <div class="row g-3">
+                        @foreach (var balance in leaveBalances)
+                        {
+                            var usagePercentage = balance.TotalAssigned > 0 ?
+                            (balance.Used * 100) / balance.TotalAssigned : 0;
+                            var remainingPercentage = 100 - usagePercentage;
+
+                            <div class="col-md-6">
+                                <div class="balance-card">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">@balance.LeaveType.Name</h6>
+                                        <span class="badge @(balance.Remaining == 0 ? "bg-danger" :
+                                                                                                                                                                                                                                                     balance.Remaining < balance.TotalAssigned / 4 ? "bg-warning" : "bg-success")">
+                                    @balance.Remaining days left
+                                </span>
+                            </div>
+
+                                    <div class="progress mb-2" style="height: 12px;">
+                                        <div class="progress-bar bg-success"
+                                             style="width: @remainingPercentage%"
+                                             title="Remaining: @balance.Remaining days">
+                                        </div>
+                                        <div class="progress-bar bg-danger"
+                                             style="width: @usagePercentage%"
+                                             title="Used: @balance.Used days">
+                                        </div>
+                                    </div>
+
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <div class="balance-stat">
+                                                <div class="balance-value">@balance.TotalAssigned</div>
+                                                <div class="balance-label">Total</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="balance-stat">
+                                                <div class="balance-value text-warning">@balance.Used</div>
+                                                <div class="balance-label">Used</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="balance-stat">
+                                                <div class="balance-value text-success">@balance.Remaining</div>
+                                                <div class="balance-label">Remaining</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                                        }
+                    </div>
+
+                    <!-- Total Summary -->
+                    <div class="mt-4 pt-3 border-top">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="total-summary">
+                                    <h6><i class="fas fa-calendar-alt me-2"></i>Year @currentYear Summary</h6>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Total Leave Days Used:</span>
+                                        <span class="fw-bold">@totalLeaveDaysThisYear days</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                        <h5>No leave balance found</h5>
+                        <p class="text-muted">Please contact HR to set up your leave balance</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Recent Leave Applications -->
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4><i class="fas fa-history me-2"></i>Recent Leave Applications</h4>
+                    <a href="@Url.Action("MyLeaves", "EmployeeDashboard")" class="btn btn-sm btn-outline-primary">
+                        View All
+                    </a>
+                </div>
+
+                @if (myLeaves.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-dark-theme">
+                            <thead>
+                                <tr>
+                                    <th>Leave Type</th>
+                                    <th>Date Range</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                    <th>Applied On</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var leave in myLeaves.Take(5))
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-info">@leave.LeaveType?.Name</span>
+                                        </td>
+                                        <td>
+                                            <div>@leave.StartDate.ToString("dd MMM")</div>
+                                            <small class="text-muted">to @leave.EndDate.ToString("dd MMM yyyy")</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">@leave.TotalDays days</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @(leave.Status == "Approved" ? "bg-success" :
+                                                                                                                                                                                                                                                                      leave.Status == "Pending" ? "bg-warning" : "bg-danger")">
+                                        @leave.Status
+                                    </span>
+                                </td>
+                                <td>@leave.AppliedOn.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    @if (leave.Status == "Pending")
+                                            {
+                                                <form method="post" action="@Url.Action("CancelLeave", "EmployeeDashboard")" style="display:inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@leave.LeaveId" />
+                                                    <button type="submit" class="btn btn-sm btn-danger"
+                                                            onclick="return confirm('Are you sure you want to cancel this leave application?')">
+                                                        <i class="fas fa-times"></i> Cancel
+                                                    </button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-3">
+                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                        <h5>No leave applications</h5>
+                        <p class="text-muted">You haven't applied for any leaves yet</p>
+                        <a href="@Url.Action("ApplyLeave", "EmployeeDashboard")" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Apply for your first leave
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+            <!-- Recent Notifications -->
+            <div class="section-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="fas fa-bell me-2"></i>Recent Notifications</h5>
+                    @{
+                        var unreadCount = notifications.Count(n => !n.IsRead);
+                        if (unreadCount > 0)
+                        {
+                            <span class="badge bg-danger">@unreadCount new</span>
+                        }
+                    }
+                </div>
+
+                <!-- Notifications section में ये change करें -->
+                <div class="notification-list">
+                    @if (notifications.Any())
+                    {
+                        @foreach (var notif in notifications.Take(5))
+                        {
+                            <div class="notification-item @(!notif.IsRead ? "unread" : "")">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="notification-content">
+                                        <p class="mb-1">@notif.Message</p>
+                                        <small class="text-muted">@notif.CreatedOn.ToString("hh:mm tt, dd MMM")</small>
+                                    </div>
+                                    @if (!notif.IsRead)
+                                    {
+                                        <form method="post"
+                                              action="@Url.Action("MarkAsRead", "Notifications")"
+                                              style="display:inline;"
+                                              class="mark-read-form">
+                                            @Html.AntiForgeryToken()
+                                            <!-- ✅ ये लाइन ADD करें: -->
+                                            <input type="hidden" name="id" value="@notif.NotificationId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-primary mark-read-btn">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (notifications.Count > 5)
+                        {
+                            <div class="text-center mt-2">
+                                <a href="@Url.Action("Index", "Notifications")" class="btn btn-sm btn-outline-primary">
+                                    View All Notifications
+                                </a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-3">
+                            <i class="fas fa-bell-slash fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">No notifications</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="section-card mt-4">
+                <h5 class="mb-3"><i class="fas fa-chart-line me-2"></i>Quick Stats</h5>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="quick-stat-card">
+                            <div class="quick-stat-icon bg-primary">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value">@leavesThisMonth</div>
+                                <div class="quick-stat-label">This Month</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="quick-stat-card">
+                            <div class="quick-stat-icon bg-success">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value">@approvedLeaves</div>
+                                <div class="quick-stat-label">Approved</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="quick-stat-card">
+                            <div class="quick-stat-icon bg-warning">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value">@pendingLeaves</div>
+                                <div class="quick-stat-label">Pending</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="quick-stat-card">
+                            <div class="quick-stat-icon bg-danger">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value">@rejectedLeaves</div>
+                                <div class="quick-stat-label">Rejected</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+
+    .dashboard-card {
+        padding: 1.5rem;
+        border-radius: 10px;
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-color: var(--primary-accent);
+        }
+
+        .dashboard-card .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary-accent);
+            margin-bottom: 1rem;
+        }
+
+            .dashboard-card .feature-icon.text-warning {
+                color: #f59e0b;
+            }
+
+            .dashboard-card .feature-icon.text-success {
+                color: #22c55e;
+            }
+
+            .dashboard-card .feature-icon.text-danger {
+                color: #ef4444;
+            }
+
+    .section-card {
+        background: var(--dark-surface);
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        margin-bottom: 1rem;
+    }
+
+    .btn-action {
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+        padding: 12px;
+        border-radius: 10px;
+        font-weight: 500;
+        transition: all 0.3s;
+        text-align: center;
+        text-decoration: none;
+        display: block;
+        width: 100%;
+    }
+
+        .btn-action:hover {
+            background: var(--primary-accent);
+            color: white;
+            border-color: var(--primary-accent);
+            transform: translateY(-2px);
+            text-decoration: none;
+        }
+
+    /* Leave Balance Cards */
+    .balance-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        transition: all 0.3s;
+        height: 100%;
+    }
+
+        .balance-card:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-2px);
+        }
+
+    .balance-stat {
+        text-align: center;
+    }
+
+    .balance-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-light);
+    }
+
+    .balance-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .total-summary {
+        background: var(--darker-surface);
+        border-radius: 8px;
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+    }
+
+    /* Upcoming Leaves */
+    .upcoming-leaves-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .upcoming-leave-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s;
+    }
+
+        .upcoming-leave-card:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-1px);
+        }
+
+    /* Notifications */
+    .notification-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.3s;
+    }
+
+        .notification-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .notification-item.unread {
+            background: rgba(59, 130, 246, 0.05);
+            border-left: 3px solid var(--primary-accent);
+        }
+
+    .notification-content {
+        flex: 1;
+        margin-right: 10px;
+    }
+
+    .mark-read-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    /* Quick Stats */
+    .quick-stat-card {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        display: flex;
+        align-items: center;
+        transition: all 0.3s;
+    }
+
+        .quick-stat-card:hover {
+            border-color: var(--primary-accent);
+            transform: translateY(-1px);
+        }
+
+    .quick-stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        margin-right: 0.75rem;
+        font-size: 1.2rem;
+    }
+
+        .quick-stat-icon.bg-primary {
+            background: #3b82f6;
+        }
+
+        .quick-stat-icon.bg-success {
+            background: #22c55e;
+        }
+
+        .quick-stat-icon.bg-warning {
+            background: #f59e0b;
+        }
+
+        .quick-stat-icon.bg-danger {
+            background: #ef4444;
+        }
+
+    .quick-stat-value {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-light);
+        line-height: 1;
+    }
+
+    .quick-stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    /* Table Styles */
+    .table-dark-theme {
+        background: var(--dark-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+        .table-dark-theme thead th {
+            background: var(--darker-surface);
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-dark-theme tbody td {
+            background: var(--dark-surface);
+            color: var(--text-light);
+            border-color: var(--border-color);
+            padding: 12px 15px;
+            vertical-align: middle;
+        }
+
+        .table-dark-theme tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--dark-surface);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 3px;
+    }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-accent);
+        }
+
+    /* Progress Bar Customization */
+    .progress {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        border-radius: 10px;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            console.log("Notification system initialized");
+
+            // Debug: Check forms
+            var forms = $('.mark-read-form');
+            console.log("Found", forms.length, "notification forms");
+
+            forms.each(function(index) {
+                var form = $(this);
+                var id = form.find('input[name="id"]').val();
+                console.log("Form", index + 1, "ID:", id);
+            });
+
+            // Mark notification as read with AJAX
+            $('.mark-read-form').submit(function(e) {
+                e.preventDefault();
+                console.log("Form submit triggered");
+
+                var form = $(this);
+                var notificationItem = form.closest('.notification-item');
+
+                // Get notification ID
+                var notificationId = form.find('input[name="id"]').val();
+                console.log("Notification ID from input:", notificationId);
+
+                if (!notificationId) {
+                    console.error("Notification ID not found in form");
+                    alert('Notification ID not found');
+                    return;
+                }
+
+                // Get anti-forgery token
+                var token = form.find('input[name="__RequestVerificationToken"]').val();
+                if (!token) {
+                    console.error("Anti-forgery token not found");
+                    alert('Security token missing');
+                    return;
+                }
+
+                console.log("Sending AJAX request...");
+
+                $.ajax({
+                    url: '/Notifications/MarkAsRead',
+                    type: 'POST',
+                    data: {
+                        __RequestVerificationToken: token,
+                        id: notificationId
+                    },
+                    success: function(response) {
+                        console.log("Server response:", response);
+
+                        if (response.success) {
+                            // Remove unread styling
+                            notificationItem.removeClass('unread');
+
+                            // Remove the mark as read button
+                            form.remove();
+
+                            // Update notification badge count
+                            updateNotificationBadge();
+
+                            // Show success message briefly
+                            setTimeout(function() {
+                                notificationItem.fadeOut(500, function() {
+                                    $(this).remove();
+                                });
+                            }, 1000);
+                        } else {
+                            alert('Error: ' + response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', error);
+                        console.error('Status:', status);
+                        console.error('Response Text:', xhr.responseText);
+                        alert('Failed to mark notification as read. Please try again.');
+                    }
+                });
+            });
+
+            // Function to update notification badge
+            function updateNotificationBadge() {
+                $.ajax({
+                    url: '/Notifications/GetUnreadCount',
+                    type: 'GET',
+                    success: function(response) {
+                        console.log("Unread count response:", response);
+
+                        // Update the badge in the header
+                        var badge = $('.badge.bg-danger').first();
+                        if (response.count > 0) {
+                            if (badge.length) {
+                                badge.text(response.count);
+                            } else {
+                                // If no badge exists, add it
+                                $('h5:contains("Recent Notifications")').find('.badge').remove();
+                                $('h5:contains("Recent Notifications")').append(
+                                    '<span class="badge bg-danger ms-2">' + response.count + '</span>'
+                                );
+                            }
+                        } else {
+                            // Hide badge if no unread notifications
+                            badge.remove();
+                        }
+                    },
+                    error: function() {
+                        console.error("Failed to get unread count");
+                    }
+                });
+            }
+
+            // Auto-refresh notifications every 30 seconds
+            setInterval(function() {
+                updateNotificationBadge();
+            }, 30000);
+        });
+    </script>
+}

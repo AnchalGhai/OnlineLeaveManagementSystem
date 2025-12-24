@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - LeavePro</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/LeaveManagementSystem.styles.css" asp-append-version="true" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+    
+    <style>
+        :root {
+            --dark-bg: #0f172a;
+            --dark-surface: #1e293b;
+            --darker-surface: #0f172a;
+            --text-light: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --primary-accent: #3b82f6;
+            --secondary-accent: #64748b;
+        }
+        * { font-family: 'Inter', sans-serif; }
+        body { background: var(--dark-bg); color: var(--text-light); min-height: 100vh; padding-top: 70px; }
+        .navbar { background: var(--darker-surface) !important; border-bottom: 1px solid var(--border-color); height: 70px; backdrop-filter: blur(10px); }
+        .navbar-brand { font-weight: 700; font-size: 1.5rem; color: var(--text-light) !important; }
+        .nav-link { font-weight: 500; color: var(--text-muted) !important; transition: all 0.3s ease; border-radius: 6px; margin: 0 2px; padding: 8px 12px !important; }
+        .nav-link:hover { color: var(--text-light) !important; background: rgba(255, 255, 255, 0.05); }
+        .hero-section { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%), url('/images/backgroundhomepage.jpg'); background-size: cover; background-position: center; min-height: 100vh; display: flex; align-items: center; position: relative; margin-top: -70px; padding-top: 70px; }
+        .hero-content { color: var(--text-light); text-align: center; }
+        .hero-title { font-size: 3.5rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-light); }
+        .hero-subtitle { font-size: 1.3rem; font-weight: 300; margin-bottom: 2rem; color: var(--text-muted); }
+        .btn-hero { background: transparent; border: 1px solid var(--border-color); color: var(--text-light); padding: 12px 30px; border-radius: 8px; font-weight: 500; text-decoration: none; transition: all 0.3s ease; margin: 0 10px; }
+        .btn-hero:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-light); border-color: var(--text-muted); }
+        .how-it-works { background: var(--dark-bg); padding: 80px 0; }
+        .step-card { background: var(--dark-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; text-align: center; transition: all 0.3s ease; height: 100%; }
+        .step-card:hover { border-color: var(--primary-accent); transform: translateY(-5px); }
+        .step-icon { font-size: 3rem; color: var(--primary-accent); margin-bottom: 1rem; }
+        .step-number { background: var(--primary-accent); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin: 0 auto 1rem auto; }
+        .login-modal { background: var(--dark-surface); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-light); }
+        .modal-header { border-bottom: 1px solid var(--border-color); background: var(--darker-surface); }
+        .modal-header .btn-close { filter: invert(1); opacity: 0.7; }
+        .form-control { background: var(--darker-surface); border: 1px solid var(--border-color); color: var(--text-light); border-radius: 8px; padding: 10px 15px; }
+        .form-control:focus { background: var(--darker-surface); border-color: var(--primary-accent); color: var(--text-light); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
+        .form-label { color: var(--text-light); font-weight: 500; margin-bottom: 8px; }
+        .btn-login { background: var(--primary-accent); border: none; color: white; padding: 12px 30px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; width: 100%; }
+        .btn-login:hover { background: #2563eb; transform: translateY(-1px); }
+        .user-badge { background: var(--dark-surface); color: var(--text-light); padding: 8px 16px; border-radius: 20px; font-weight: 500; font-size: 0.9rem; border: 1px solid var(--border-color); text-decoration: none; }
+        .user-badge:hover { color: var(--text-light); text-decoration: none; background: rgba(255, 255, 255, 0.05); }
+        .table-dark-theme { background: var(--dark-surface); color: var(--text-light); border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
+        .table-dark-theme thead th { background: var(--darker-surface); color: var(--text-light); border-bottom: 1px solid var(--border-color); padding: 15px; font-weight: 600; }
+        .table-dark-theme tbody td { background: var(--dark-surface); color: var(--text-light); border-color: var(--border-color); padding: 12px 15px; vertical-align: middle; }
+        .table-dark-theme tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+        .dashboard-container { background: var(--dark-surface); border-radius: 12px; padding: 2rem; border: 1px solid var(--border-color); margin: 20px 0; }
+        .dashboard-card { background: var(--darker-surface); border-radius: 8px; padding: 1.5rem; border: 1px solid var(--border-color); transition: all 0.3s ease; }
+        .dashboard-card:hover { border-color: var(--primary-accent); }
+        .badge { font-size: 0.8rem; padding: 6px 12px; font-weight: 500; }
+        .btn-warning { background: #f59e0b; border: none; color: #000; }
+        .btn-danger { background: #dc2626; border: none; color: white; }
+        .btn-success { background: #16a34a; border: none; color: white; }
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+            <div class="container">
+                <a class="navbar-brand" asp-controller="Home" asp-action="Index">
+                    <i class="fas fa-calendar-alt me-2"></i>LeavePro
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">
+                                <i class="fas fa-home me-1"></i>Home
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Home" asp-action="Privacy">
+                                <i class="fas fa-shield-alt me-1"></i>Privacy
+                            </a>
+                        </li>
+                    </ul>
+                    <div class="navbar-nav">
+                        @if (Context.Session.GetString("UserId") != null)
+                        {
+                            <div class="nav-item">
+                                <span class="nav-link user-badge">
+                                    <i class="fas fa-user me-1"></i>
+                                    @Context.Session.GetString("UserName")
+                                    <small class="ms-1 opacity-75">(@Context.Session.GetString("Role"))</small>
+                                </span>
+                            </div>
+                            <div class="nav-item">
+                                <a class="nav-link" asp-controller="Account" asp-action="Logout">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content login-modal">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Welcome Back</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @TempData["Error"]
+                        </div>
+                    }
+                    <form asp-controller="Account" asp-action="Login" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Email Address</label>
+                            <input type="email" class="form-control" name="email" placeholder="Enter your email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="password" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit" class="btn btn-login">
+                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        $(document).ready(function() {
+            @if (TempData["Error"] != null)
+            {
+                <text>$('#loginModal').modal('show');</text>
+            }
+
+            // ✅ BROWSER BACK BUTTON PREVENTION - LOGOUT ON BACK
+            history.pushState(null, null, location.href);
+            
+            window.onpopstate = function () {
+                // Check if user is logged in
+                const isLoggedIn = @(Context.Session.GetString("UserId") != null ? "true" : "false");
+                
+                if (isLoggedIn) {
+                    // Redirect to logout
+                    window.location.href = '@Url.Action("Logout", "Account")';
+                }
+            };
+        });
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

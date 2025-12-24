@@ -1,0 +1,419 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Team Leave Calendar";
+}
+
+<div class="dashboard-container">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-filter"></i>
+                </span>
+                <select class="form-control" id="employeeFilter">
+                    <option value="all">All Team Members</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-calendar"></i>
+                </span>
+                <select class="form-control" id="monthFilter">
+                    <option value="">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <button class="btn btn-primary w-100 h-100" id="refreshCalendar">
+                Refresh Calendar
+            </button>
+        </div>
+    </div>
+
+    <!-- Calendar Loading -->
+    <div id="calendarLoading" class="text-center p-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading calendar data...</p>
+    </div>
+
+    <!-- Calendar Container -->
+    <div id="teamCalendar"></div>
+
+    <!-- Calendar Legend -->
+    <div class="mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h5><i class="fas fa-info-circle me-2"></i>Calendar Legend</h5>
+                <div class="row mt-2">
+                    <div class="col-md-3 mb-2">
+                        <span class="badge bg-success p-2 w-100">
+                            <i class="fas fa-calendar-check me-1"></i>Approved Leave
+                        </span>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <span class="badge bg-warning p-2 w-100">
+                            <i class="fas fa-hourglass-half me-1"></i>Pending Approval
+                        </span>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <span class="badge bg-danger p-2 w-100">
+                            <i class="fas fa-times-circle me-1"></i>Rejected
+                        </span>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <span class="badge bg-secondary p-2 w-100">
+                            <i class="fas fa-ban me-1"></i>Cancelled
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 20px;
+        background: var(--dark-surface);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        margin: 20px 0;
+    }
+
+    #teamCalendar {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 10px;
+        border: 1px solid #dee2e6;
+        min-height: 600px !important;
+    }
+
+    /* Calendar styling */
+    .fc .fc-button {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        color: white !important;
+    }
+
+        .fc .fc-button:hover {
+            background-color: #2563eb !important;
+            border-color: #2563eb !important;
+        }
+
+    .fc-toolbar-title {
+        color: #1e293b !important;
+        font-weight: 600 !important;
+    }
+
+    .fc-daygrid-day-number {
+        color: #1e293b !important;
+        font-weight: 500 !important;
+    }
+
+    .fc-day-today {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+    }
+
+    .badge {
+        font-size: 0.9rem;
+        padding: 8px 15px;
+        border-radius: 6px;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Global variables
+        let calendar = null;
+        let teamMembers = [];
+        let allEvents = [];
+
+                // Get color based on status
+        function getStatusColor(status) {
+            switch (status?.toLowerCase()) {
+                case 'approved':
+                    return '#198754'; // Bootstrap success color (dark green)
+                case 'pending':
+                    return '#ffc107'; // Bootstrap warning color (yellow)
+                case 'rejected':
+                    return '#dc3545'; // Bootstrap danger color (red)
+                case 'cancelled':
+                    return '#6c757d'; // Bootstrap secondary color (gray)
+                default:
+                    return '#3b82f6'; // Blue (default)
+            }
+        }
+
+        // Get badge class based on status
+        function getStatusBadge(status) {
+            switch (status?.toLowerCase()) {
+                case 'approved':
+                    return 'bg-success';
+                case 'pending':
+                    return 'bg-warning';
+                case 'rejected':
+                    return 'bg-danger';
+                case 'cancelled':
+                    return 'bg-secondary';
+                default:
+                    return 'bg-info';
+            }
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Initialize calendar
+        function initializeCalendar() {
+            const calendarEl = document.getElementById('teamCalendar');
+            const loadingEl = document.getElementById('calendarLoading');
+
+            if (!calendarEl) return;
+
+            // Show loading
+            if (loadingEl) loadingEl.style.display = 'block';
+
+            // Get filter values
+            const employeeId = $('#employeeFilter').val() || 'all';
+            const month = $('#monthFilter').val();
+
+            console.log('Loading calendar with filters:', { employeeId, month });
+
+            // AJAX call to get team leave events
+            $.ajax({
+                url: '@Url.Action("GetTeamLeaveEvents", "ManagerDashboard")',
+                type: 'GET',
+                success: function(response) {
+                    console.log('Calendar data received:', response);
+
+                    if (loadingEl) loadingEl.style.display = 'none';
+
+                    if (!response.success || !response.events) {
+                        calendarEl.innerHTML = '<div class="alert alert-warning">No leave data available.</div>';
+                        return;
+                    }
+
+                    // Store all events
+                    allEvents = response.events;
+
+                    // Apply filters
+                    let filteredEvents = allEvents;
+                    if (employeeId !== 'all') {
+                        filteredEvents = filteredEvents.filter(event => {
+                            return event.employee.toLowerCase().includes(employeeId.toLowerCase());
+                        });
+                    }
+
+                    if (month) {
+                        filteredEvents = filteredEvents.filter(event => {
+                            const eventMonth = new Date(event.start).getMonth() + 1;
+                            return eventMonth == month;
+                        });
+                    }
+
+                    console.log('Filtered events:', filteredEvents.length);
+
+                    try {
+                        // Destroy previous calendar
+                        if (calendar) {
+                            calendar.destroy();
+                        }
+
+                        // Format events with colors based on status
+                        const formattedEvents = filteredEvents.map(event => {
+                            const status = event.status || event.extendedProps?.status;
+                            const color = getStatusColor(status);
+
+                            return {
+                                ...event,
+                                color: color,
+                                backgroundColor: color, // 20% opacity
+                                borderColor: color,
+                                textColor: '#ffffff'
+                            };
+                        });
+
+                        // Create new calendar
+                        calendar = new FullCalendar.Calendar(calendarEl, {
+                            themeSystem: 'bootstrap5',
+                            initialView: 'dayGridMonth',
+                            height: 600,
+                            headerToolbar: {
+                                left: 'prev,next today',
+                                center: 'title',
+                                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                            },
+                            buttonText: {
+                                today: 'Today',
+                                month: 'Month',
+                                week: 'Week',
+                                day: 'Day'
+                            },
+                            dayMaxEvents: 3,
+                            events: formattedEvents,
+                            eventClick: function(info) {
+                                const event = info.event;
+                                const props = event.extendedProps;
+                                const status = props?.status || 'N/A';
+                                const badgeClass = getStatusBadge(status);
+
+                                Swal.fire({
+                                    title: 'Leave Details',
+                                    html: `
+                                        <div class="text-start">
+                                            <p><strong>Employee:</strong> ${event.title.split(' - ')[0]}</p>
+                                            <p><strong>Leave Type:</strong> ${props?.leaveType || 'N/A'}</p>
+                                            <p><strong>Status:</strong>
+                                                <span class="badge ${badgeClass} ms-2">${status}</span>
+                                            </p>
+                                            <p><strong>From:</strong> ${formatDate(event.startStr)}</p>
+                                            <p><strong>To:</strong> ${event.end ? formatDate(new Date(new Date(event.end).setDate(new Date(event.end).getDate() - 1)).toISOString()) : formatDate(event.startStr)}</p>
+                                            <p><strong>Days:</strong> ${props?.days || '1'}</p>
+                                            ${props?.reason ? `<p><strong>Reason:</strong> ${props.reason}</p>` : ''}
+                                            ${props?.managerComments ? `<p><strong>Manager Comments:</strong> ${props.managerComments}</p>` : ''}
+                                            <p><strong>Applied On:</strong> ${props?.appliedOn ? formatDate(props.appliedOn) : 'N/A'}</p>
+                                        </div>
+                                    `,
+                                    icon: 'info',
+                                    confirmButtonColor: '#3b82f6',
+                                    width: '500px',
+                                    showCloseButton: true
+                                });
+                            },
+                            eventDidMount: function(info) {
+                                // Add tooltip
+                                const props = info.event.extendedProps;
+                                if (props) {
+                                    const status = props.status || 'N/A';
+                                    info.el.title = `${props.employee} - ${props.leaveType} (${props.days} days) - Status: ${status}`;
+                                }
+                            }
+                        });
+
+                        calendar.render();
+
+                    } catch (error) {
+                        console.error('Calendar error:', error);
+                        calendarEl.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h4>Error Loading Calendar</h4>
+                                <p>${error.message}</p>
+                                <button class="btn btn-primary mt-2" onclick="initializeCalendar()">
+                                    <i class="fas fa-redo me-2"></i>Try Again
+                                </button>
+                            </div>
+                        `;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading calendar:', error);
+                    if (loadingEl) loadingEl.style.display = 'none';
+                    calendarEl.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h4>Error Loading Calendar Data</h4>
+                            <p>Failed to load leave data. Please try again.</p>
+                            <button class="btn btn-primary mt-2" onclick="initializeCalendar()">
+                                <i class="fas fa-redo me-2"></i>Retry
+                            </button>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Load team members for filter
+        function loadTeamMembers() {
+            $.ajax({
+                url: '@Url.Action("GetTeamMembersForCalendar", "ManagerDashboard")',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.teamMembers) {
+                        const employeeFilter = $('#employeeFilter');
+                        employeeFilter.empty();
+                        employeeFilter.append('<option value="all">All Team Members</option>');
+
+                        response.teamMembers.forEach(member => {
+                            employeeFilter.append(`<option value="${member.id}">${member.name}</option>`);
+                        });
+                    }
+                },
+                error: function() {
+                    // Fallback if endpoint doesn't exist
+                    const employeeFilter = $('#employeeFilter');
+                    employeeFilter.empty();
+                    employeeFilter.append('<option value="all">All Team Members</option>');
+                }
+            });
+        }
+
+        // Document ready
+        $(document).ready(function() {
+            console.log('Team Calendar page loaded');
+
+            // Load team members
+            loadTeamMembers();
+
+            // Initialize calendar
+            initializeCalendar();
+
+            // Refresh button
+            $('#refreshCalendar').click(function() {
+                console.log('Refreshing calendar...');
+                initializeCalendar();
+            });
+
+            // Filter changes
+            $('#employeeFilter, #monthFilter').change(function() {
+                console.log('Filter changed, reloading calendar...');
+                initializeCalendar();
+            });
+
+            // Auto-dismiss alerts
+            setTimeout(function() {
+                $('.alert').alert('close');
+            }, 5000);
+        });
+    </script>
+}

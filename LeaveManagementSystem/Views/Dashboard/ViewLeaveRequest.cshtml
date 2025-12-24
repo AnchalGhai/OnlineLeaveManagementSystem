@@ -1,0 +1,658 @@
+﻿@model LeaveManagementSystem.Models.Entities.LeaveApplication
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "View Leave Request";
+
+    var availableBalance = ViewBag.AvailableBalance ?? 0;
+    var leaveBalance = ViewBag.LeaveBalance as LeaveManagementSystem.Models.Entities.LeaveBalance;
+}
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-calendar-check me-2"></i>Leave Request Details</h2>
+        <div>
+            <a href="@Url.Action("AllLeaveRequests", "Dashboard")" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to All Leaves
+            </a>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Left Column - Request Details -->
+        <div class="col-md-8">
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Leave Request Information</h5>
+                    <span class="badge bg-primary">ID: @Model.LeaveId</span>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Employee Name</label>
+                            <div class="info-value">@Model.User.FullName</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Role</label>
+                            <div class="info-value">
+                                @if (Model.User.Role == "Manager")
+                                {
+                                    <span class="badge bg-warning">@Model.User.Role</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-primary">@Model.User.Role</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Department</label>
+                            <div class="info-value">
+                                @if (Model.User.Department != null)
+                                {
+                                    <span class="badge bg-info">@Model.User.Department.Name</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Email</label>
+                            <div class="info-value">@Model.User.Email</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Leave Type</label>
+                            <div class="info-value">
+                                <span class="badge bg-secondary">@Model.LeaveType?.Name</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Manager</label>
+                            <div class="info-value">
+                                @if (Model.User.Manager != null)
+                                {
+                                    <span class="text-success">@Model.User.Manager.FullName</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">No Manager</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Start Date</label>
+                            <div class="info-value">
+                                <i class="fas fa-calendar-day me-1 text-primary"></i>
+                                @Model.StartDate.ToString("dddd, dd MMMM yyyy")
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">End Date</label>
+                            <div class="info-value">
+                                <i class="fas fa-calendar-day me-1 text-primary"></i>
+                                @Model.EndDate.ToString("dddd, dd MMMM yyyy")
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Total Days</label>
+                            <div class="info-value">
+                                <span class="badge bg-info">@Model.TotalDays day(s)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Applied On</label>
+                            <div class="info-value">
+                                <i class="fas fa-clock me-1 text-warning"></i>
+                                @Model.AppliedOn.ToString("dd MMM yyyy hh:mm tt")
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="info-item mb-3">
+                            <label class="form-label text-muted">Reason for Leave</label>
+                            <div class="info-box p-3">
+                                @Model.Reason
+                            </div>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.ManagerComments))
+                    {
+                        <div class="col-12">
+                            <div class="info-item mb-3">
+                                <label class="form-label text-muted">Manager Comments</label>
+                                <div class="info-box p-3 @(Model.Status == "Rejected" ? "rejected-bg" : "manager-comments")">
+                                    @Model.ManagerComments
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Status Timeline - FIXED -->
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Status Timeline</h5>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-item @(Model.AppliedOn != null ? "active" : "")">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h6>Applied</h6>
+                            <small class="text-muted">@Model.AppliedOn.ToString("dd MMM yyyy hh:mm tt")</small>
+                        </div>
+                    </div>
+
+                    @if (Model.Status != "Pending")
+                    {
+                        <div class="timeline-item active">
+                            <div class="timeline-marker @(Model.Status == "Approved" ? "approved" : Model.Status == "Rejected" ? "rejected" : "")"></div>
+                            <div class="timeline-content">
+                                @{
+                                    string actionText = Model.Status;
+
+                                    if (Model.Status == "Cancelled")
+                                    {
+                                        if (string.IsNullOrEmpty(Model.ManagerComments))
+                                        {
+                                            actionText = "Cancelled by Employee";
+                                        }
+                                        else if (Model.ManagerComments.Contains("by Manager"))
+                                        {
+                                            actionText = "Cancelled by Manager";
+                                        }
+                                        else if (Model.ManagerComments.Contains("by Admin"))
+                                        {
+                                            actionText = "Cancelled by Admin";
+                                        }
+                                        else if (Model.ManagerComments.Contains("by employee"))
+                                        {
+                                            actionText = "Cancelled by Employee";
+                                        }
+                                    }
+                                    else if (Model.Status == "Approved" || Model.Status == "Rejected")
+                                    {
+                                        if (Model.User.Role == "Manager")
+                                        {
+                                            actionText = Model.Status + " by Admin";
+                                        }
+                                        else
+                                        {
+                                            actionText = Model.Status + " by Manager";
+                                        }
+                                    }
+                                }
+
+                                <h6>@actionText</h6>
+                                @if (Model.ActionDate.HasValue)
+                                {
+                                    <small class="text-muted">@Model.ActionDate.Value.ToString("dd MMM yyyy hh:mm tt")</small>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                @if (Model.User.Role == "Manager")
+                                {
+                                    <h6>Pending Admin Approval</h6>
+                                    <small class="text-muted">Awaiting Admin action</small>
+                                }
+                                else
+                                {
+                                    <h6>Pending Manager Approval</h6>
+                                    <small class="text-muted">Awaiting Manager action</small>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Actions & Balance -->
+        <div class="col-md-4">
+            <!-- Status Card -->
+            <div class="section-card mb-4">
+                <div class="text-center">
+                    <h5 class="mb-3">Current Status</h5>
+                    @if (Model.Status == "Approved")
+                    {
+                        <div class="status-badge approved mb-3">
+                            <i class="fas fa-check-circle fa-3x"></i>
+                            <h4 class="mt-2">APPROVED</h4>
+                        </div>
+                        @if (Model.User.Role == "Manager")
+                        {
+                            <p class="text-muted">This leave has been approved by Admin.</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">This leave has been approved by Manager.</p>
+                        }
+                    }
+                    else if (Model.Status == "Pending")
+                    {
+                        <div class="status-badge pending mb-3">
+                            <i class="fas fa-clock fa-3x"></i>
+                            <h4 class="mt-2">PENDING</h4>
+                        </div>
+                        @if (Model.User.Role == "Manager")
+                        {
+                            <p class="text-muted">Awaiting Admin approval.</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Awaiting Manager approval.</p>
+                        }
+                    }
+                    else if (Model.Status == "Rejected")
+                    {
+                        <div class="status-badge rejected mb-3">
+                            <i class="fas fa-times-circle fa-3x"></i>
+                            <h4 class="mt-2">REJECTED</h4>
+                        </div>
+                        @if (Model.User.Role == "Manager")
+                        {
+                            <p class="text-muted">This leave has been rejected by Admin.</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">This leave has been rejected by Manager.</p>
+                        }
+                    }
+                    else if (Model.Status == "Cancelled")
+                    {
+                        <div class="status-badge cancelled mb-3">
+                            <i class="fas fa-ban fa-3x"></i>
+                            <h4 class="mt-2">CANCELLED</h4>
+                        </div>
+                        @if (string.IsNullOrEmpty(Model.ManagerComments))
+                        {
+                            <p class="text-muted">This leave has been cancelled by Employee.</p>
+                        }
+                        else if (Model.ManagerComments.Contains("by Manager"))
+                        {
+                            <p class="text-muted">This leave has been cancelled by Manager.</p>
+                        }
+                        else if (Model.ManagerComments.Contains("by Admin"))
+                        {
+                            <p class="text-muted">This leave has been cancelled by Admin.</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">This leave has been cancelled.</p>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Employee's Leave Balance -->
+            <div class="section-card mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">@(Model.User.Role == "Manager" ? "Manager's" : "Employee's") Leave Balance</h5>
+                </div>
+                @if (leaveBalance != null)
+                {
+                    <div class="balance-info">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Leave Type:</span>
+                            <strong>@Model.LeaveType?.Name</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Assigned:</span>
+                            <strong>@leaveBalance.TotalAssigned days</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Used:</span>
+                            <strong class="text-warning">@leaveBalance.Used days</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Remaining:</span>
+                            <strong class="@(availableBalance < 5 ? "text-danger" : "text-success")">
+                                @availableBalance days
+                            </strong>
+                        </div>
+                        <hr class="my-3" />
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Requested Days:</span>
+                            <strong>@Model.TotalDays days</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">After Approval:</span>
+                            <strong class="@((availableBalance - Model.TotalDays) < 0 ? "text-danger" : "text-success")">
+                                @(availableBalance - Model.TotalDays) days
+                            </strong>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        No leave balance found.
+                    </div>
+                }
+            </div>
+
+            <!-- Admin Actions (Only for Manager leaves) -->
+            @if (Model.User.Role == "Manager" && Model.Status == "Pending")
+            {
+                <div class="section-card">
+                    <h5 class="mb-3">Admin Actions</h5>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This is a Manager's leave request. Only Admin can approve/reject it.
+                    </div>
+
+                    <a href="@Url.Action("ViewManagerLeaveRequest", "Dashboard", new { id = Model.LeaveId })"
+                       class="btn btn-warning w-100">
+                        <i class="fas fa-user-tie me-1"></i>Take Action
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Auto-expand textareas based on content
+            $('textarea').each(function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+        });
+    </script>
+}
+
+<style>
+    /* Dark Theme Colors */
+    .dashboard-container {
+        padding: 20px;
+        color: var(--text-light);
+    }
+
+    .section-card {
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-item {
+        margin-bottom: 1rem;
+    }
+
+        .info-item label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+            display: block;
+        }
+
+        .info-item .info-value {
+            color: var(--text-light);
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+    .info-box {
+        background: var(--darker-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-light);
+    }
+
+    .manager-comments {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .rejected-bg {
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+    }
+
+    /* Status Badges */
+    .status-badge {
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+        .status-badge.approved {
+            color: #22c55e;
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-badge.pending {
+            color: #f59e0b;
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-badge.rejected {
+            color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-badge.cancelled {
+            color: #94a3b8;
+            background-color: rgba(148, 163, 184, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+    /* Timeline */
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--border-color);
+        }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+    .timeline-marker {
+        position: absolute;
+        left: -33px;
+        top: 0;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: var(--border-color);
+        border: 3px solid var(--dark-surface);
+        z-index: 1;
+        transition: all 0.3s;
+    }
+
+        .timeline-marker.approved {
+            background-color: #22c55e;
+        }
+
+        .timeline-marker.rejected {
+            background-color: #ef4444;
+        }
+
+    .timeline-item.active .timeline-marker:not(.approved):not(.rejected) {
+        background-color: var(--primary-accent);
+    }
+
+    .timeline-content h6 {
+        color: var(--text-light);
+        margin-bottom: 0.2rem;
+    }
+
+    .timeline-content small {
+        color: var(--text-muted);
+    }
+
+    /* Balance Info */
+    .balance-info {
+        color: var(--text-light);
+    }
+
+        .balance-info hr {
+            border-color: var(--border-color);
+        }
+
+    /* Buttons */
+    .btn-outline-secondary {
+        border-color: var(--border-color);
+        color: var(--text-muted);
+    }
+
+        .btn-outline-secondary:hover {
+            background-color: var(--dark-surface);
+            color: var(--text-light);
+            border-color: var(--text-muted);
+        }
+
+    .btn-warning {
+        background-color: #f59e0b;
+        border-color: #f59e0b;
+        color: #000;
+    }
+
+        .btn-warning:hover {
+            background-color: #e69000;
+            border-color: #e69000;
+            color: #000;
+        }
+
+    /* Badges */
+    .badge {
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: 20px;
+    }
+
+    .bg-primary {
+        background-color: var(--primary-accent) !important;
+    }
+
+    .bg-success {
+        background-color: #22c55e !important;
+    }
+
+    .bg-warning {
+        background-color: #f59e0b !important;
+    }
+
+    .bg-danger {
+        background-color: #ef4444 !important;
+    }
+
+    .bg-info {
+        background-color: #0ea5e9 !important;
+    }
+
+    .bg-secondary {
+        background-color: #64748b !important;
+    }
+
+    /* Alerts */
+    .alert {
+        border: 1px solid;
+        border-radius: 8px;
+        background-color: transparent;
+    }
+
+    .alert-success {
+        background-color: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+        color: #22c55e;
+    }
+
+    .alert-danger {
+        background-color: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #ef4444;
+    }
+
+    .alert-warning {
+        background-color: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #f59e0b;
+    }
+
+    /* Icons */
+    .text-primary {
+        color: var(--primary-accent) !important;
+    }
+
+    .text-warning {
+        color: #f59e0b !important;
+    }
+
+    .text-success {
+        color: #22c55e !important;
+    }
+
+    .text-danger {
+        color: #ef4444 !important;
+    }
+
+    .text-muted {
+        color: var(--text-muted) !important;
+    }
+</style>

@@ -1,0 +1,870 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Reports";
+
+    var yearWiseStats = ViewBag.YearWiseStats as System.Collections.IEnumerable;
+    var deptStats = ViewBag.DepartmentStats as System.Collections.IEnumerable;
+    var topEmployees = ViewBag.TopEmployees as System.Collections.IEnumerable;
+    var managerReports = ViewBag.ManagerReports as System.Collections.IEnumerable;
+    var leaveTypeStats = ViewBag.LeaveTypeStats as System.Collections.IEnumerable;
+    var monthlyTrends = ViewBag.MonthlyTrends as System.Collections.IEnumerable;
+    var leaveBalanceOverview = ViewBag.LeaveBalanceOverview as System.Collections.IEnumerable;
+    var recentLeaves = ViewBag.RecentLeaves as System.Collections.IEnumerable;
+    var pendingSummary = ViewBag.PendingSummary as System.Collections.IEnumerable;
+    var approvalTrends = ViewBag.ApprovalTrends as System.Collections.IEnumerable;
+}
+
+<div class="dashboard-container">
+    <!-- HEADER -->
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Reports Dashboard</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a class="btn btn-secondary" href="@Url.Action("Admin", "Dashboard")">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- QUICK STATS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="quick-stat-card bg-primary">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon me-3">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0">@ViewBag.TotalActiveEmployees</h4>
+                        <small>Active Employees</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="quick-stat-card bg-warning">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon me-3">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0">@ViewBag.TotalActiveManagers</h4>
+                        <small>Active Managers</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="quick-stat-card bg-info">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon me-3">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0">@ViewBag.TotalDepartments</h4>
+                        <small>Departments</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="quick-stat-card bg-success">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon me-3">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0">@ViewBag.CurrentMonthLeaves</h4>
+                        <small>This Month's Leaves</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT WITH TABS -->
+    <div class="main-report-container">
+        <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+                    <i class="fas fa-home me-2"></i>Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="department-tab" data-bs-toggle="tab" data-bs-target="#department" type="button">
+                    <i class="fas fa-building me-2"></i>Department Analysis
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="employee-tab" data-bs-toggle="tab" data-bs-target="#employee" type="button">
+                    <i class="fas fa-users me-2"></i>User Reports
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="manager-tab" data-bs-toggle="tab" data-bs-target="#manager" type="button">
+                    <i class="fas fa-user-tie me-2"></i>Manager Performance
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="leavetype-tab" data-bs-toggle="tab" data-bs-target="#leavetype" type="button">
+                    <i class="fas fa-file-contract me-2"></i>Leave Types
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="reportTabsContent">
+
+            <!-- TAB 1: OVERVIEW -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row g-4 mt-3">
+                    <!-- Charts -->
+                    <div class="col-lg-6">
+                        <div class="report-card">
+                            <h5><i class="fas fa-chart-line me-2"></i>Monthly Leave Trends</h5>
+                            <canvas id="monthlyTrendsChart" height="250"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="report-card">
+                            <h5><i class="fas fa-chart-pie me-2"></i>Leave Type Distribution</h5>
+                            <canvas id="leaveTypeChart" height="250"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Year-wise Stats -->
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <h5><i class="fas fa-calendar-alt me-2"></i>Year-wise Comparison</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Year</th>
+                                            <th>Total Leaves</th>
+                                            <th>Total Days</th>
+                                            <th>Avg Days/Leave</th>
+                                            <th>Approved</th>
+                                            <th>Pending</th>
+                                            <th>Rejected</th>
+                                            <th>Approval Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (yearWiseStats != null)
+                                        {
+                                            foreach (dynamic year in yearWiseStats)
+                                            {
+                                                var approvalRate = year.TotalLeaves > 0 ?
+                                                Math.Round((year.Approved * 100.0) / year.TotalLeaves, 1) : 0;
+
+                                                <tr>
+                                                    <td class="fw-bold">@year.Year</td>
+                                                    <td>@year.TotalLeaves</td>
+                                                    <td>@year.TotalDays</td>
+                                                    <td>@year.AvgDays.ToString("0.0")</td>
+                                                    <td><span class="badge bg-success">@year.Approved</span></td>
+                                                    <td><span class="badge bg-warning">@year.Pending</span></td>
+                                                    <td><span class="badge bg-danger">@year.Rejected</span></td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar bg-success"
+                                                                 style="width: @approvalRate%">
+                                                                @approvalRate%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Leaves -->
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <h5><i class="fas fa-history me-2"></i>Recent Leave Applications (Last 7 Days)</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Department</th>
+                                            <th>Leave Type</th>
+                                            <th>Period</th>
+                                            <th>Days</th>
+                                            <th>Status</th>
+                                            <th>Applied On</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (recentLeaves != null)
+                                        {
+                                            foreach (dynamic leave in recentLeaves)
+                                            {
+                                                <tr>
+                                                    <td>@leave.EmployeeName</td>
+                                                    <td>@leave.Department</td>
+                                                    <td>@leave.LeaveType</td>
+                                                    <td>
+                                                        @Convert.ToDateTime(leave.StartDate).ToString("dd-MMM")
+                                                        to
+                                                        @Convert.ToDateTime(leave.EndDate).ToString("dd-MMM")
+                                                    </td>
+                                                    <td>@leave.TotalDays</td>
+                                                    <td>
+                                                        <span class="badge @(leave.Status == "Approved" ? "bg-success" :
+                                                                                                                               leave.Status == "Pending" ? "bg-warning" : "bg-danger")">
+                                                    @leave.Status
+                                                </span>
+                                            </td>
+                                            <td>@leave.AppliedOn</td>
+                                        </tr>
+                                                                                }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: DEPARTMENT ANALYSIS -->
+            <div class="tab-pane fade" id="department" role="tabpanel">
+                <div class="row g-4 mt-3">
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <h5><i class="fas fa-building me-2"></i>Department-wise Leave Analysis</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Employees</th>
+                                            <th>Total Leaves</th>
+                                            <th>Total Days</th>
+                                            <th>Avg Days/Leave</th>
+                                            <th>Approved</th>
+                                            <th>Pending</th>
+                                            <th>Rejected</th>
+                                            <th>Approval Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (deptStats != null)
+                                        {
+                                            foreach (dynamic dept in deptStats)
+                                            {
+                                                var approvalRate = dept.TotalLeaves > 0 ?
+                                                Math.Round((dept.Approved * 100.0) / dept.TotalLeaves, 1) : 0;
+
+                                                <tr>
+                                                    <td class="fw-bold">@dept.Department</td>
+                                                    <td>@dept.EmployeeCount</td>
+                                                    <td>@dept.TotalLeaves</td>
+                                                    <td>@dept.TotalDays</td>
+                                                    <td>@dept.AvgDays.ToString("0.0")</td>
+                                                    <td><span class="badge bg-success">@dept.Approved</span></td>
+                                                    <td><span class="badge bg-warning">@dept.Pending</span></td>
+                                                    <td><span class="badge bg-danger">@dept.Rejected</span></td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar bg-info"
+                                                                 style="width: @approvalRate%">
+                                                                @approvalRate%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: ALL USERS REPORTS -->
+            <div class="tab-pane fade" id="employee" role="tabpanel">
+                <div class="row g-4 mt-3">
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0"><i class="fas fa-users me-2"></i>All Users Leave Report</h5>
+                                <div class="d-flex gap-2">
+                                    <input type="text" id="userSearch" class="form-control" placeholder="Search users..." style="width: 200px;">
+                                    <select id="roleFilter" class="form-select" style="width: 150px;">
+                                        <option value="all">All Roles</option>
+                                        <option value="Employee">Employees</option>
+                                        <option value="Manager">Managers</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                <table class="table table-hover" id="userReportTable">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Name</th>
+                                            <th>Role</th>
+                                            <th>Department</th>
+                                            <th>Manager</th>
+                                            <th>Total Leaves</th>
+                                            <th>Total Days</th>
+                                            <th>Approved</th>
+                                            <th>Pending</th>
+                                            <th>Rejected</th>
+                                            <th>Approval Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (ViewBag.AllUsersLeaveReport != null)
+                                        {
+                                            int rank = 1;
+                                            foreach (dynamic user in ViewBag.AllUsersLeaveReport)
+                                            {
+                                                <tr data-role="@user.Role">
+                                                    <td>@rank</td>
+                                                    <td class="fw-bold">
+                                                        @user.UserName <!-- ✅ Manager tag REMOVED -->
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge @(user.Role == "Manager" ? "bg-warning" : "bg-info")">
+                                                            @user.Role
+                                                        </span>
+                                                    </td>
+                                                    <td>@user.Department</td>
+                                                    <td>@user.ManagerName</td>
+                                                    <td>@user.TotalLeaves</td>
+                                                    <td>
+                                                        @if (user.TotalDays > 0)
+                                                        {
+                                                            <span class="badge bg-primary">@user.TotalDays days</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-secondary">0 days</span>
+                                                        }
+                                                    </td>
+                                                    <td><span class="badge bg-success">@user.Approved</span></td>
+                                                    <td><span class="badge bg-warning">@user.Pending</span></td>
+                                                    <td><span class="badge bg-danger">@user.Rejected</span></td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar @(user.ApprovalRate >= 80 ? "bg-success" :
+                                                                                                                                          user.ApprovalRate >= 60 ? "bg-info" :
+                                                                                                                                          user.ApprovalRate >= 40 ? "bg-warning" : "bg-danger")"
+                                                         style="width: @user.ApprovalRate%">
+                                                        @user.ApprovalRate.ToString("0.0")%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                            rank++;
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3 text-muted">
+                                <small>
+                                    Showing @(ViewBag.AllUsersLeaveReport != null ? ((System.Collections.IEnumerable)ViewBag.AllUsersLeaveReport).Cast<object>().Count() : 0) users
+                                    (Employees + Managers)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: MANAGER PERFORMANCE - UPDATED -->
+            <div class="tab-pane fade" id="manager" role="tabpanel">
+                <div class="row g-4 mt-3">
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>Manager Performance</h5>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="managerPerformanceTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Manager</th>
+                                            <th>Department</th>
+                                            <th>Team Size</th>
+                                            <th>Team Leaves</th>
+                                            <th>Approved</th>
+                                            <th>Pending</th>
+                                            <th>Rejected</th> 
+                                            <th>Approval Rate</th>
+                                            <th>Performance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (managerReports != null)
+                                        {
+                                            foreach (dynamic mgr in managerReports)
+                                            {
+                                                var performance = mgr.ApprovalRate >= 90 ? "Excellent" :
+                                                mgr.ApprovalRate >= 80 ? "Good" :
+                                                mgr.ApprovalRate >= 70 ? "Average" : "Needs Improvement";
+
+                                                var performanceClass = mgr.ApprovalRate >= 90 ? "bg-success" :
+                                                mgr.ApprovalRate >= 80 ? "bg-info" :
+                                                mgr.ApprovalRate >= 70 ? "bg-warning" : "bg-danger";
+
+                                                <tr>
+                                                    <td class="fw-bold">@mgr.Manager.FullName</td>
+                                                    <td>@mgr.Department</td>
+                                                    <td>@mgr.TeamSize</td>
+                                                    <td>@mgr.TeamLeaves</td>
+                                                    <td><span class="badge bg-success">@mgr.TeamApproved</span></td>
+                                                    <td><span class="badge bg-warning">@mgr.TeamPending</span></td>
+                                                    <td><span class="badge bg-danger">@mgr.TeamRejected</span></td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar @performanceClass"
+                                                                 style="width: @mgr.ApprovalRate%">
+                                                                @mgr.ApprovalRate%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge @performanceClass">@performance</span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: LEAVE TYPES -->
+            <div class="tab-pane fade" id="leavetype" role="tabpanel">
+                <div class="row g-4 mt-3">
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <h5><i class="fas fa-file-contract me-2"></i>Leave Type Analysis</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Leave Type</th>
+                                            <th>Total Leaves</th>
+                                            <th>Total Days</th>
+                                            <th>Avg Days/Leave</th>
+                                            <th>Approved</th>
+                                            <th>Pending</th>
+                                            <th>Approval Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (leaveTypeStats != null)
+                                        {
+                                            foreach (dynamic type in leaveTypeStats)
+                                            {
+                                                var approvalRate = type.Count > 0 ?
+                                                Math.Round((type.Approved * 100.0) / type.Count, 1) : 0;
+
+                                                <tr>
+                                                    <td class="fw-bold">@type.LeaveType</td>
+                                                    <td>@type.Count</td>
+                                                    <td>@type.TotalDays</td>
+                                                    <td>@type.AvgDays.ToString("0.0")</td>
+                                                    <td><span class="badge bg-success">@type.Approved</span></td>
+                                                    <td><span class="badge bg-warning">@type.Pending</span></td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar bg-primary"
+                                                                 style="width: @approvalRate%">
+                                                                @approvalRate%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leave Balance Overview -->
+                    <div class="col-lg-12">
+                        <div class="report-card">
+                            <h5><i class="fas fa-balance-scale me-2"></i>Leave Balance Overview</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Leave Type</th>
+                                            <th>Employees</th>
+                                            <th>Total Assigned</th>
+                                            <th>Total Used</th>
+                                            <th>Total Remaining</th>
+                                            <th>Utilization Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (leaveBalanceOverview != null)
+                                        {
+                                            foreach (dynamic balance in leaveBalanceOverview)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold">@balance.LeaveType</td>
+                                                    <td>@balance.TotalEmployees</td>
+                                                    <td>@balance.TotalAssigned</td>
+                                                    <td>@balance.TotalUsed</td>
+                                                    <td>
+                                                        <span class="badge @(balance.TotalRemaining > 0 ? "bg-success" : "bg-danger")">
+                                                            @balance.TotalRemaining
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar @(balance.UtilizationRate > 80 ? "bg-danger" :
+                                                                                                                                                      balance.UtilizationRate > 60 ? "bg-warning" : "bg-success")"
+                                                         style="width: @balance.UtilizationRate%">
+                                                        @Math.Round(balance.UtilizationRate, 1)%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                                                                }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 20px;
+        background: var(--dark-surface);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        margin: 20px 0;
+    }
+
+    .quick-stat-card {
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.3s;
+    }
+
+        .quick-stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .quick-stat-card .stat-icon {
+            font-size: 2rem;
+            opacity: 0.8;
+        }
+
+        .quick-stat-card h4 {
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .quick-stat-card small {
+            opacity: 0.9;
+        }
+
+    .main-report-container {
+        background: var(--darker-surface);
+        border-radius: 10px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+    }
+
+    .report-card {
+        background: var(--dark-surface);
+        border-radius: 10px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 20px;
+        height: 100%;
+    }
+
+        .report-card h5 {
+            color: var(--primary-accent);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+    /* Tab Styles */
+    .nav-tabs {
+        border-bottom: 2px solid var(--border-color);
+    }
+
+        .nav-tabs .nav-link {
+            color: var(--text-light);
+            border: none;
+            border-radius: 8px 8px 0 0;
+            margin-right: 5px;
+            padding: 12px 20px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+            .nav-tabs .nav-link:hover {
+                background: rgba(59, 130, 246, 0.1);
+                color: var(--primary-accent);
+            }
+
+            .nav-tabs .nav-link.active {
+                background: var(--primary-accent);
+                color: white;
+                border: none;
+            }
+    /* Table Styles */
+    .table {
+        color: var(--text-light);
+        border-color: var(--border-color);
+    }
+
+        .table thead th {
+            background: var(--darker-surface);
+            border-bottom: 2px solid var(--border-color);
+            font-weight: 600;
+            color: var(--primary-accent);
+        }
+
+        /* ✅ FIXED: Lighter hover effect */
+        .table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.08) !important; /* Lighter blue */
+            color: var(--text-light) !important;
+        }
+
+    /* ✅ FIXED: Better contrast for table-hover */
+    .table-hover tbody tr:hover {
+        background: rgba(59, 130, 246, 0.12) !important; /* Slightly stronger but still readable */
+        color: var(--text-light) !important;
+    }
+
+    /* ✅ Ensure text remains visible on hover */
+    .table tbody tr:hover td {
+        color: var(--text-light) !important;
+        text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+
+    /* ✅ Badge colors remain visible on hover */
+    .table tbody tr:hover .badge {
+        opacity: 0.95;
+    }
+
+    /* ✅ Progress bars remain visible */
+    .table tbody tr:hover .progress-bar {
+        opacity: 0.9;
+    }
+
+    .badge {
+        font-size: 0.8rem;
+        padding: 5px 10px;
+        font-weight: 500;
+    }
+
+    .progress {
+        background-color: var(--border-color);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        font-size: 12px;
+        font-weight: 600;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Initialize tabs
+            $('#reportTabs a').on('click', function (e) {
+                e.preventDefault();
+                $(this).tab('show');
+            });
+
+            // Monthly Trends Chart
+            var monthlyCtx = document.getElementById('monthlyTrendsChart');
+            if (monthlyCtx) {
+                var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                var totalData = Array(12).fill(0);
+                var approvedData = Array(12).fill(0);
+                var pendingData = Array(12).fill(0);
+
+                @if (monthlyTrends != null)
+                {
+                        foreach (dynamic month in monthlyTrends)
+                        {
+                                <text>
+                                totalData[@month.Month - 1] = @month.Total;
+                                approvedData[@month.Month - 1] = @month.Approved;
+                                pendingData[@month.Month - 1] = @month.Pending;
+                                </text>
+                        }
+                }
+
+                new Chart(monthlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: monthNames,
+                        datasets: [
+                            {
+                                label: 'Total Leaves',
+                                data: totalData,
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                borderColor: '#3b82f6',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Approved',
+                                data: approvedData,
+                                backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                borderColor: '#22c55e',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Pending',
+                                data: pendingData,
+                                backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                                borderColor: '#f59e0b',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#f1f5f9'
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#f1f5f9',
+                                    callback: function(value) {
+                                        return Number.isInteger(value) ? value : '';
+                                    }
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#f1f5f9'
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Leave Type Chart
+            var leaveTypeCtx = document.getElementById('leaveTypeChart');
+            if (leaveTypeCtx) {
+                var leaveTypes = [];
+                var leaveCounts = [];
+                var leaveColors = [
+                    '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
+                    '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
+                    '#64748b', '#84cc16'
+                ];
+
+                @if (leaveTypeStats != null)
+                {
+                        foreach (dynamic type in leaveTypeStats)
+                        {
+                                <text>
+                                leaveTypes.push('@type.LeaveType');
+                                leaveCounts.push(@type.Count);
+                                </text>
+                        }
+                }
+
+                new Chart(leaveTypeCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: leaveTypes,
+                        datasets: [{
+                            data: leaveCounts,
+                            backgroundColor: leaveColors.slice(0, leaveTypes.length),
+                            borderWidth: 1,
+                            borderColor: '#1e293b'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    color: '#f1f5f9',
+                                    padding: 20,
+                                    font: {
+                                        size: 11
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+                    // Users Search and Filter Functionality
+        $(document).ready(function() {
+            // Search functionality
+            $('#userSearch').on('keyup', function() {
+                var value = $(this).val().toLowerCase();
+                var roleFilter = $('#roleFilter').val();
+
+                $('#userReportTable tbody tr').filter(function() {
+                    var text = $(this).text().toLowerCase();
+                    var role = $(this).data('role');
+
+                    var textMatch = text.indexOf(value) > -1;
+                    var roleMatch = roleFilter === 'all' || role === roleFilter;
+
+                    $(this).toggle(textMatch && roleMatch);
+                });
+            });
+
+            // Role filter functionality
+            $('#roleFilter').on('change', function() {
+                $('#userSearch').trigger('keyup');
+            });
+        });
+           
+        });
+    </script>
+}

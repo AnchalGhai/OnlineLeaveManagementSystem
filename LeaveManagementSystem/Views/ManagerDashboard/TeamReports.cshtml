@@ -1,0 +1,451 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Team Reports";
+
+    var monthlyLeaves = ViewBag.MonthlyLeaves as System.Collections.IEnumerable;
+    var leaveTypeStats = ViewBag.LeaveTypeStats as System.Collections.IEnumerable;
+    var employeeStats = ViewBag.EmployeeStats as System.Collections.IEnumerable;
+}
+
+<div class="dashboard-container">
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Team Reports & Analytics</h2>
+            <p class="text-muted mb-0">Comprehensive analytics for your team's leave patterns</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a class="btn btn-secondary" href="@Url.Action("Index", "ManagerDashboard")">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-primary">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                @{
+                    int totalLeaves = 0;
+                    if (monthlyLeaves != null)
+                    {
+                        foreach (dynamic month in monthlyLeaves)
+                        {
+                            totalLeaves += month.Count ?? 0;
+                        }
+                    }
+                }
+                <h3 class="mb-2">@totalLeaves</h3>
+                <p class="text-muted mb-0">Total Leaves This Year</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                @{
+                    int approvedLeaves = 0;
+                    if (monthlyLeaves != null)
+                    {
+                        foreach (dynamic month in monthlyLeaves)
+                        {
+                            approvedLeaves += month.Approved ?? 0;
+                        }
+                    }
+                }
+                <h3 class="mb-2">@approvedLeaves</h3>
+                <p class="text-muted mb-0">Approved Leaves</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-warning">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                @{
+                    int pendingLeaves = 0;
+                    if (monthlyLeaves != null)
+                    {
+                        foreach (dynamic month in monthlyLeaves)
+                        {
+                            pendingLeaves += month.Pending ?? 0;
+                        }
+                    }
+                }
+                <h3 class="mb-2">@pendingLeaves</h3>
+                <p class="text-muted mb-0">Pending Leaves</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card text-center">
+                <div class="feature-icon text-danger">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                @{
+                    int rejectedLeaves = 0;
+                    if (monthlyLeaves != null)
+                    {
+                        foreach (dynamic month in monthlyLeaves)
+                        {
+                            rejectedLeaves += month.Rejected ?? 0;
+                        }
+                    }
+                }
+                <h3 class="mb-2">@rejectedLeaves</h3>
+                <p class="text-muted mb-0">Rejected Leaves</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row g-4">
+        <!-- Monthly Trends -->
+        <div class="col-lg-8">
+            <div class="section-card">
+                <h5 class="mb-3"><i class="fas fa-chart-line me-2"></i>Monthly Leave Trends (@DateTime.Now.Year)</h5>
+                <canvas id="monthlyTrendsChart" height="250"></canvas>
+            </div>
+        </div>
+
+        <!-- Leave Type Distribution -->
+        <div class="col-lg-4">
+            <div class="section-card">
+                <h5 class="mb-3"><i class="fas fa-chart-pie me-2"></i>Leave Type Distribution</h5>
+                <canvas id="leaveTypeChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Performance -->
+    <div class="row g-4 mt-4">
+        <div class="col-lg-12">
+            <div class="section-card">
+                <h5 class="mb-3"><i class="fas fa-user-chart me-2"></i>Employee Leave Summary</h5>
+                <div class="table-responsive">
+                    <table class="table table-dark-theme">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Total Leaves</th>
+                                <th>Total Days</th>
+                                <th>Approved</th>
+                                <th>Pending</th>
+                                <th>Rejected</th>
+                                <th>Approval Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (employeeStats != null)
+                            {
+                                foreach (dynamic emp in employeeStats)
+                                {
+                                    var approvalRate = (emp.TotalLeaves ?? 0) > 0 ? ((emp.Approved ?? 0) * 100) / (emp.TotalLeaves ?? 1) : 0;
+
+                                    <tr>
+                                        <td>
+                                            <div class="fw-medium">@emp.EmployeeName</div>
+                                        </td>
+                                        <td>@emp.TotalLeaves</td>
+                                        <td>@emp.TotalDays</td>
+                                        <td><span class="badge bg-success">@emp.Approved</span></td>
+                                        <td><span class="badge bg-warning">@emp.Pending</span></td>
+                                        <td><span class="badge bg-danger">@emp.Rejected</span></td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" role="progressbar"
+                                                     style="width: @approvalRate%"
+                                                     aria-valuenow="@approvalRate"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100">
+                                                    @approvalRate%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">No data available for team reports</p>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Statistics -->
+    <div class="row g-4 mt-4">
+        <div class="col-md-6">
+            <div class="section-card">
+                <h5 class="mb-3"><i class="fas fa-list-ol me-2"></i>Monthly Breakdown</h5>
+                <div class="table-responsive">
+                    <table class="table table-dark-theme table-sm">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Total</th>
+                                <th>Approved</th>
+                                <th>Pending</th>
+                                <th>Rejected</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (monthlyLeaves != null)
+                            {
+                                foreach (dynamic month in monthlyLeaves)
+                                {
+                                    <tr>
+                                        <td>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month.Month)</td>
+                                        <td>@month.Count</td>
+                                        <td><span class="badge bg-success">@month.Approved</span></td>
+                                        <td><span class="badge bg-warning">@month.Pending</span></td>
+                                        <td><span class="badge bg-danger">@month.Rejected</span></td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+
+    .dashboard-card {
+        padding: 1.5rem;
+        border-radius: 10px;
+        background: var(--dark-surface);
+        border: 1px solid var(--border-color);
+        transition: transform 0.3s;
+    }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-accent);
+        }
+
+        .dashboard-card .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+    .section-card {
+        background: var(--dark-surface);
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        height: 100%;
+    }
+
+    .table-dark-theme {
+        background: var(--dark-surface);
+        color: var(--text-light);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+        .table-dark-theme thead th {
+            background: var(--darker-surface);
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-dark-theme tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+    .progress {
+        background-color: var(--border-color);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .alert-info {
+        background-color: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+        color: #dbeafe;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Monthly Trends Chart
+            var monthlyCtx = document.getElementById('monthlyTrendsChart');
+            if (monthlyCtx) {
+                var monthNames = [];
+                var monthCounts = [];
+                var monthApproved = [];
+                var monthPending = [];
+                var monthRejected = [];
+
+                @if (monthlyLeaves != null)
+                {
+                            foreach (dynamic month in monthlyLeaves)
+                            {
+                                        <text>
+                                        monthNames.push('@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month.Month)');
+                                        monthCounts.push(@month.Count);
+                                        monthApproved.push(@month.Approved);
+                                        monthPending.push(@month.Pending);
+                                        monthRejected.push(@month.Rejected);
+                                        </text>
+                            }
+                }
+
+                new Chart(monthlyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: monthNames,
+                        datasets: [
+                            {
+                                label: 'Total Leaves',
+                                data: monthCounts,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Approved',
+                                data: monthApproved,
+                                borderColor: '#22c55e',
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Pending',
+                                data: monthPending,
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Rejected',
+                                data: monthRejected,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#f1f5f9'
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#f1f5f9'
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#f1f5f9'
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Leave Type Chart
+            var leaveTypeCtx = document.getElementById('leaveTypeChart');
+            if (leaveTypeCtx) {
+                var leaveTypes = [];
+                var leaveCounts = [];
+
+                @if (leaveTypeStats != null)
+                {
+                            foreach (dynamic type in leaveTypeStats)
+                            {
+                                        <text>
+                                        leaveTypes.push('@type.LeaveType');
+                                        leaveCounts.push(@type.Count);
+                                        </text>
+                            }
+                }
+
+                new Chart(leaveTypeCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: leaveTypes,
+                        datasets: [{
+                            data: leaveCounts,
+                            backgroundColor: [
+                                '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
+                                '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#f1f5f9',
+                                    padding: 20
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+}
+
+@functions {
+    private int GetEmployeeCount(System.Collections.IEnumerable employeeStats)
+    {
+        int count = 0;
+        if (employeeStats != null)
+        {
+            foreach (var emp in employeeStats)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+}
