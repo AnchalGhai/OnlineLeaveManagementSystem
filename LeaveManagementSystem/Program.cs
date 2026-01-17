@@ -1,28 +1,92 @@
-using LeaveManagementSystem.Models;
+﻿using LeaveManagementSystem.Models;
 using LeaveManagementSystem.Models.Entities;
 using Microsoft.EntityFrameworkCore;
-using BCrypt.Net;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
+// ✅ 1. ADD AUTHORIZATION SERVICES (MISSING)
+builder.Services.AddAuthorization();
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Cookies["jwt_token"];
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            },
+
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine("Authentication failed: " + context.Exception.Message);
+                if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+                {
+                    context.Response.Cookies.Delete("jwt_token");
+                    context.Response.Redirect("/?error=expiry"); // ✅ Redirect to home
+                }
+                else
+                    context.Response.Redirect("/?error=exception"); // ✅ Redirect to home
+                return Task.CompletedTask;
+            },
+
+            // ✅ FIX FOR 401 WHEN NO TOKEN
+            OnChallenge = context =>
+            {
+                // Only redirect if not already on home page
+                if (context.Request.Path != "/" &&
+                    !context.Request.Path.StartsWithSegments("/Home"))
+                {
+                    context.Response.Redirect("/"); // ✅ Redirect to home page
+                    context.HandleResponse(); // Stop default 401 response
+                }
+                return Task.CompletedTask;
+            }
+        };
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes("OnlineLeaveManagementSystemJWTSecretKey12345"))
+        };
+    });
+
+// Add services
 builder.Services.AddControllersWithViews();
 
-// Register DbContext
+// Database context
 builder.Services.AddDbContext<DatabaseContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("LMSConnection")));
 
-// Add Session
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-});
-
 var app = builder.Build();
 
-// Seed Departments (optional, but required for Manager/Employee)
+// ✅ 3. CORRECT MIDDLEWARE ORDER
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting(); // ✅ ROUTING FIRST
+
+app.UseAuthentication(); // ✅ AUTHENTICATION SECOND
+app.UseAuthorization();  // ✅ AUTHORIZATION THIRD
+
+// Seed code (keep as is)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
@@ -44,16 +108,15 @@ using (var scope = app.Services.CreateScope())
          new LeaveType
          { Name = "Casual Leave", MaxPerYear = 12 },
          new LeaveType
-         {  Name = "Sick Leave",    MaxPerYear = 10 },
+         { Name = "Sick Leave", MaxPerYear = 10 },
          new LeaveType
          { Name = "Earned Leave", MaxPerYear = 15 }
          );
- 
-         db.SaveChanges();
-        Console.WriteLine("Seeded LeaveTyoes: Sick,Casual,Earned");
+
+        db.SaveChanges();
+        Console.WriteLine("Seeded LeaveTypes: Sick, Casual, Earned");
     }
 
-    // Seed Admin user if not exists
     if (!db.Users.Any(u => u.Role == "Admin"))
     {
         var admin = new User
@@ -64,7 +127,7 @@ using (var scope = app.Services.CreateScope())
             Role = "Admin",
             IsActive = true,
             DateOfJoining = DateTime.Now,
-            DepartmentId = null // Admin has no department
+            DepartmentId = null
         };
 
         db.Users.Add(admin);
@@ -73,20 +136,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure middleware
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
-}
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
-
-// Enable Session
-app.UseSession();
-app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",

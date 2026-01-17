@@ -1,8 +1,10 @@
-﻿@model LeaveManagementSystem.Models.Entities.LeaveApplication
+﻿@using System.Security.Claims
+@model LeaveManagementSystem.Models.Entities.LeaveApplication
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    var userId = Context.Session.GetInt32("UserId") ?? 0;
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var userId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
     var leaveTypes = ViewBag.LeaveTypes as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
     var leaveBalances = ViewBag.LeaveBalances as List<LeaveManagementSystem.Models.Entities.LeaveBalance>;
 }

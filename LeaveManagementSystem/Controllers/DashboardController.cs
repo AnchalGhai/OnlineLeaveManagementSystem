@@ -4,9 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+
 
 namespace LeaveManagementSystem.Controllers
 {
+    [Authorize(Roles = "Admin")] // ✅ ADD THIS LINE - JWT AUTHORIZATION
     public class DashboardController : Controller
     {
         private readonly DatabaseContext _context;
@@ -15,13 +20,56 @@ namespace LeaveManagementSystem.Controllers
         {
             _context = context;
         }
+        // ✅ HELPER METHOD TO CHECK ADMIN ROLE FROM JWT
+        private bool IsAdmin()
+        {
+            var jwtToken = HttpContext.Request.Cookies["jwt_token"];
+            if (string.IsNullOrEmpty(jwtToken)) return false;
 
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var token = handler.ReadJwtToken(jwtToken);
+                var role = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+                return role == "Admin";
+            }
+            catch
+            {
+                // Token invalid - delete cookie
+                Response.Cookies.Delete("jwt_token");
+                return false;
+            }
+        }
+
+        // ✅ HELPER METHOD TO GET USER ID FROM JWT
+        private int GetUserIdFromJwt()
+        {
+            var jwtToken = HttpContext.Request.Cookies["jwt_token"];
+            if (string.IsNullOrEmpty(jwtToken)) return 0;
+
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var token = handler.ReadJwtToken(jwtToken);
+                var userIdClaim = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(userIdClaim, out int userId))
+                    return userId;
+            }
+            catch
+            {
+                // Token invalid - delete cookie
+                Response.Cookies.Delete("jwt_token");
+            }
+
+            return 0;
+        }
         // ---------------------------
         // Admin Dashboard
         // ---------------------------
         public async Task<IActionResult> Admin()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ Check using ONLY JWT
+            if (!IsAdmin()) // ✅ CHANGE TO IsAdmin()
                 return RedirectToAction("Index", "Home");
 
             // Metrics
@@ -88,7 +136,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> ManagerLeaveRequests()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var managerLeaves = await _context.LeaveApplications
@@ -107,7 +156,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> ViewManagerLeaveRequest(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -139,7 +189,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveManagerLeave(int id, string comments)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -197,7 +248,20 @@ namespace LeaveManagementSystem.Controllers
                 _context.Notifications.Add(notification);
 
                 await _context.SaveChangesAsync();
+                try
+                {
+                    var manager = await _context.Users.FindAsync(leaveRequest.UserId);
+                    var admin = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
 
+                    if (manager != null && admin != null && !string.IsNullOrEmpty(manager.Email))
+                    {
+                        Email.SendManagerStatus(manager.Email, manager.FullName, leaveRequest, admin.FullName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Email error: {ex.Message}");
+                }
                 TempData["SuccessMessage"] = $"Manager's leave request approved successfully for {leaveRequest.User.FullName}. Balance deducted: {leaveRequest.TotalDays} days.";
             }
             catch (Exception ex)
@@ -215,7 +279,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RejectManagerLeave(int id, string comments)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -253,7 +318,20 @@ namespace LeaveManagementSystem.Controllers
                 _context.Notifications.Add(notification);
 
                 await _context.SaveChangesAsync();
+                try
+                {
+                    var manager = await _context.Users.FindAsync(leaveRequest.UserId);
+                    var admin = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
 
+                    if (manager != null && admin != null && !string.IsNullOrEmpty(manager.Email))
+                    {
+                        Email.SendManagerStatus(manager.Email, manager.FullName, leaveRequest, admin.FullName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Email error: {ex.Message}");
+                }
                 TempData["SuccessMessage"] = $"Manager's leave request rejected for {leaveRequest.User.FullName}. No balance deducted.";
             }
             catch (Exception ex)
@@ -269,7 +347,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> AllLeaveRequests()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var allLeaves = await _context.LeaveApplications
@@ -289,7 +368,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> ViewLeaveRequest(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -323,7 +403,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveLeave(int id, string comments)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -399,7 +480,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RejectLeave(int id, string comments)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveRequest = await _context.LeaveApplications
@@ -453,7 +535,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> ManageUser(int? id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             User model;
@@ -479,7 +562,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ManageUser(User model)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             ModelState.Remove("PasswordHash");
@@ -767,10 +851,11 @@ namespace LeaveManagementSystem.Controllers
 
         public async Task<IActionResult> ToggleAdminStatus(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT 
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
-            var currentAdminId = HttpContext.Session.GetInt32("UserId") ?? 0;
+            var currentAdminId = GetUserIdFromJwt();
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
 
@@ -799,7 +884,8 @@ namespace LeaveManagementSystem.Controllers
 
         public async Task<IActionResult> DeleteUser(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var user = await _context.Users.FindAsync(id);
@@ -844,7 +930,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateDepartment(string Name)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             if (string.IsNullOrWhiteSpace(Name))
@@ -880,7 +967,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT 
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var dept = await _context.Departments.FindAsync(id);
@@ -926,32 +1014,7 @@ namespace LeaveManagementSystem.Controllers
             }
         }
 
-        public async Task<IActionResult> Manager()
-        {
-            if (HttpContext.Session.GetString("Role") != "Manager")
-                return RedirectToAction("Index", "Home");
-
-            int managerId = HttpContext.Session.GetInt32("UserId") ?? 0;
-            ViewBag.PendingRequests = await _context.LeaveApplications
-                .Include(l => l.User)
-                .Where(x => x.User.ManagerId == managerId && x.Status == "Pending")
-                .CountAsync();
-
-            return View();
-        }
-
-        public async Task<IActionResult> Employee()
-        {
-            if (HttpContext.Session.GetString("Role") != "Employee")
-                return RedirectToAction("Index", "Home");
-
-            int userId = HttpContext.Session.GetInt32("UserId") ?? 0;
-            ViewBag.MyLeaves = await _context.LeaveApplications
-                .Where(x => x.UserId == userId)
-                .CountAsync();
-
-            return View();
-        }
+        // ✅ REMOVED: Manager() and Employee() methods - These should be in their own controllers
 
         // ---------------------------
         // Helpers
@@ -977,7 +1040,8 @@ namespace LeaveManagementSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> CreateBalancesForExistingUsers()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             try
@@ -1089,7 +1153,8 @@ namespace LeaveManagementSystem.Controllers
         {
             try
             {
-                if (HttpContext.Session.GetString("Role") != "Admin")
+                // ✅ UPDATED: Check using JWT 
+                if (!IsAdmin())
                     return Json(new { success = false, message = "Unauthorized" });
 
                 var leave = await _context.LeaveApplications
@@ -1190,7 +1255,8 @@ namespace LeaveManagementSystem.Controllers
         // GET: Leave Policies List
         public async Task<IActionResult> LeavePolicies()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var leaveTypes = await _context.LeaveTypes
@@ -1203,7 +1269,8 @@ namespace LeaveManagementSystem.Controllers
         // GET: Create/Edit Leave Policy
         public async Task<IActionResult> ManageLeavePolicy(int? id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             LeaveType model;
@@ -1225,7 +1292,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ManageLeavePolicy(LeaveType model)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT + Session hybrid
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             if (!ModelState.IsValid)
@@ -1296,7 +1364,8 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteLeavePolicy(int id)
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             try
@@ -1357,7 +1426,7 @@ namespace LeaveManagementSystem.Controllers
         {
             // ✅ Only get NON-ADMIN users (Employees and Managers)
             var users = await _context.Users
-                .Where(u => u.Role != "Admin" && u.IsActive)  
+                .Where(u => u.Role != "Admin" && u.IsActive)
                 .ToListAsync();
 
             var leaveType = await _context.LeaveTypes.FindAsync(leaveTypeId);
@@ -1422,7 +1491,8 @@ namespace LeaveManagementSystem.Controllers
         // ---------------------------
         public async Task<IActionResult> Reports()
         {
-            if (HttpContext.Session.GetString("Role") != "Admin")
+            // ✅ UPDATED: Check using JWT
+            if (!IsAdmin())
                 return RedirectToAction("Index", "Home");
 
             var currentYear = DateTime.Now.Year;

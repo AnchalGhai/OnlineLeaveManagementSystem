@@ -1,6 +1,11 @@
 ﻿using LeaveManagementSystem.Models;
+using LeaveManagementSystem.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace LeaveManagementSystem.Controllers
 {
@@ -12,41 +17,76 @@ namespace LeaveManagementSystem.Controllers
         {
             _context = context;
         }
-
-        // POST: /Account/Login
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string email, string password)
         {
-            // ✅ Check if user is active
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Email == email && x.IsActive);
-
-            // Check password using BCrypt
-            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
             {
-                TempData["Error"] = "Invalid email or password!";
+                TempData["Error"] = "Please enter both email and password.";
                 return RedirectToAction("Index", "Home");
             }
 
-            // Store session values
-            HttpContext.Session.SetInt32("UserId", user.UserId);
-            HttpContext.Session.SetString("UserName", user.FullName);
-            HttpContext.Session.SetString("Role", user.Role);
-            HttpContext.Session.SetString("DepartmentId", user.DepartmentId?.ToString() ?? "");
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower() && u.IsActive);
 
-            // ✅ FIX: Redirect to correct controllers
+            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            {
+                TempData["Error"] = "Invalid email or password.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            // Generate JWT token
+            var token = GenerateJwtToken(user);
+
+            // ✅ FIXED COOKIE SETTINGS
+            Response.Cookies.Append("jwt_token", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true, // ✅ CHANGE TO TRUE for HTTPS
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTime.UtcNow.AddMinutes(30),
+                Path = "/",
+                Domain = null,
+                IsEssential = true
+            });
+            // Redirect based on role
             return user.Role switch
             {
                 "Admin" => RedirectToAction("Admin", "Dashboard"),
-                "Manager" => RedirectToAction("Index", "ManagerDashboard"),  // ✅ CHANGED
-                _ => RedirectToAction("Index", "EmployeeDashboard"),         // ✅ CHANGED
+                "Manager" => RedirectToAction("Index", "ManagerDashboard"),
+                _ => RedirectToAction("Index", "EmployeeDashboard")
             };
         }
+        // ✅ SIR KE PATTERN: JWT Token Generation
+        private string GenerateJwtToken(User user)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
 
-        // GET: /Account/Logout
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes("OnlineLeaveManagementSystemJWTSecretKey12345"));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.Now.AddHours(3),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
         public IActionResult Logout()
         {
-            HttpContext.Session.Clear();
+            // ✅ SIR KE PATTERN: Delete JWT cookie
+            Response.Cookies.Delete("jwt_token");
             return RedirectToAction("Index", "Home");
         }
     }

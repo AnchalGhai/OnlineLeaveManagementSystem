@@ -3,9 +3,13 @@ using LeaveManagementSystem.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LeaveManagementSystem.Controllers
 {
+    [Authorize(Roles = "Employee")] // ✅ ONLY JWT AUTHORIZATION
     public class EmployeeDashboardController : Controller
     {
         private readonly DatabaseContext _context;
@@ -15,13 +19,53 @@ namespace LeaveManagementSystem.Controllers
             _context = context;
         }
 
+        // ✅ HELPER: Get current user info from JWT token ONLY
+        private (int UserId, string Role, string Name) GetCurrentUserFromJwt()
+        {
+            var jwtToken = HttpContext.Request.Cookies["jwt_token"];
+
+            if (string.IsNullOrEmpty(jwtToken))
+                return (0, "", "");
+
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var token = handler.ReadJwtToken(jwtToken);
+
+                var userIdClaim = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                var roleClaim = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+                var nameClaim = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
+
+                if (int.TryParse(userIdClaim, out int userId))
+                    return (userId, roleClaim ?? "", nameClaim ?? "");
+            }
+            catch (Exception)
+            {
+                // Token invalid - delete cookie
+                Response.Cookies.Delete("jwt_token");
+            }
+
+            return (0, "", "");
+        }
+
+        // ✅ HELPER: Simple method to get just user ID
+        private int GetUserIdFromJwt()
+        {
+            var (userId, _, _) = GetCurrentUserFromJwt();
+            return userId;
+        }
+
         // GET: Employee Dashboard
         public async Task<IActionResult> Index()
         {
-            if (HttpContext.Session.GetString("Role") != "Employee")
-                return RedirectToAction("Index", "Home");
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
 
-            int userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
+                return RedirectToAction("Index", "Home");
+            }
 
             // Dashboard metrics
             ViewBag.MyLeaves = await _context.LeaveApplications
@@ -53,9 +97,14 @@ namespace LeaveManagementSystem.Controllers
         // GET: Apply for Leave
         public async Task<IActionResult> ApplyLeave()
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null || HttpContext.Session.GetString("Role") != "Employee")
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
+
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
                 return RedirectToAction("Index", "Home");
+            }
 
             // Check if user has leave balances
             var hasBalances = await _context.LeaveBalances
@@ -85,9 +134,14 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApplyLeave(LeaveApplication model)
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null || HttpContext.Session.GetString("Role") != "Employee")
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
+
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
                 return RedirectToAction("Index", "Home");
+            }
 
             var user = await _context.Users
                 .Include(u => u.Manager)
@@ -103,32 +157,32 @@ namespace LeaveManagementSystem.Controllers
             if (model.LeaveTypeId <= 0)
             {
                 TempData["ErrorMessage"] = "Please select a leave type";
-                return await LoadApplyLeavePage(userId.Value);
+                return await LoadApplyLeavePage(userId);
             }
 
             if (model.StartDate == default || model.EndDate == default)
             {
                 TempData["ErrorMessage"] = "Please select both start and end dates";
-                return await LoadApplyLeavePage(userId.Value);
+                return await LoadApplyLeavePage(userId);
             }
 
             if (string.IsNullOrWhiteSpace(model.Reason) || model.Reason.Length < 10)
             {
                 TempData["ErrorMessage"] = "Reason must be at least 10 characters";
-                return await LoadApplyLeavePage(userId.Value);
+                return await LoadApplyLeavePage(userId);
             }
 
             if (model.EndDate < model.StartDate)
             {
                 TempData["ErrorMessage"] = "End date cannot be earlier than start date";
-                return await LoadApplyLeavePage(userId.Value);
+                return await LoadApplyLeavePage(userId);
             }
 
             try
             {
                 // Calculate total days
                 model.TotalDays = (model.EndDate - model.StartDate).Days + 1;
-                model.UserId = userId.Value;
+                model.UserId = userId;
                 model.Status = "Pending";
                 model.AppliedOn = DateTime.Now;
 
@@ -144,7 +198,7 @@ namespace LeaveManagementSystem.Controllers
                         // Create new balance
                         balance = new LeaveBalance
                         {
-                            UserId = userId.Value,
+                            UserId = userId,
                             LeaveTypeId = model.LeaveTypeId,
                             TotalAssigned = leaveType.MaxPerYear,
                             Used = 0,
@@ -156,7 +210,7 @@ namespace LeaveManagementSystem.Controllers
                     else
                     {
                         TempData["ErrorMessage"] = "Leave type not found";
-                        return await LoadApplyLeavePage(userId.Value);
+                        return await LoadApplyLeavePage(userId);
                     }
                 }
 
@@ -164,7 +218,7 @@ namespace LeaveManagementSystem.Controllers
                 if (model.TotalDays > balance.Remaining)
                 {
                     TempData["ErrorMessage"] = $"Not enough leave balance. Available: {balance.Remaining} days";
-                    return await LoadApplyLeavePage(userId.Value);
+                    return await LoadApplyLeavePage(userId);
                 }
 
                 // Check for overlapping leaves
@@ -180,7 +234,7 @@ namespace LeaveManagementSystem.Controllers
                 if (overlappingLeaves.Any())
                 {
                     TempData["ErrorMessage"] = "You have already applied for leave during this period.";
-                    return await LoadApplyLeavePage(userId.Value);
+                    return await LoadApplyLeavePage(userId);
                 }
 
                 // Create leave application
@@ -199,6 +253,9 @@ namespace LeaveManagementSystem.Controllers
                     };
                     _context.Notifications.Add(notification);
                     await _context.SaveChangesAsync();
+                    var employee = await _context.Users.FindAsync(userId);
+                    if (employee != null && !string.IsNullOrEmpty(employee.Email))
+                        Email.SendEmployeeApplied(employee.Email, employee.FullName, model);
                 }
 
                 TempData["SuccessMessage"] = "Leave application submitted successfully! It will be reviewed by your manager.";
@@ -207,7 +264,7 @@ namespace LeaveManagementSystem.Controllers
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = $"Error: {ex.Message}";
-                return await LoadApplyLeavePage(userId.Value);
+                return await LoadApplyLeavePage(userId);
             }
         }
 
@@ -229,9 +286,14 @@ namespace LeaveManagementSystem.Controllers
         // GET: My Leave Applications
         public async Task<IActionResult> MyLeaves()
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null || HttpContext.Session.GetString("Role") != "Employee")
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
+
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
                 return RedirectToAction("Index", "Home");
+            }
 
             var leaves = await _context.LeaveApplications
                 .Include(l => l.LeaveType)
@@ -247,9 +309,14 @@ namespace LeaveManagementSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelLeave(int id)
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null || HttpContext.Session.GetString("Role") != "Employee")
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
+
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
                 return RedirectToAction("Index", "Home");
+            }
 
             var leave = await _context.LeaveApplications
                 .FirstOrDefaultAsync(l => l.LeaveId == id && l.UserId == userId);
@@ -269,8 +336,8 @@ namespace LeaveManagementSystem.Controllers
             try
             {
                 leave.Status = "Cancelled";
-                leave.ActionDate = null; // ✅ NULL karo
-                leave.ManagerComments = null; // ✅ NULL karo (isse "-" show hoga)
+                leave.ActionDate = null;
+                leave.ManagerComments = null;
 
                 await _context.SaveChangesAsync();
 
@@ -283,12 +350,18 @@ namespace LeaveManagementSystem.Controllers
 
             return RedirectToAction("MyLeaves");
         }
+
         // View Leave Details
         public async Task<IActionResult> LeaveDetails(int id)
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null || HttpContext.Session.GetString("Role") != "Employee")
+            // ✅ ONLY JWT CHECK
+            var (userId, role, name) = GetCurrentUserFromJwt();
+
+            if (userId == 0 || role != "Employee")
+            {
+                TempData["Error"] = "Please login to continue";
                 return RedirectToAction("Index", "Home");
+            }
 
             var leave = await _context.LeaveApplications
                 .Include(l => l.LeaveType)
@@ -313,8 +386,8 @@ namespace LeaveManagementSystem.Controllers
         // GET: Leave Balance Summary (for dashboard widgets)
         public async Task<JsonResult> GetDashboardSummary()
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null) return Json(new { success = false });
+            var userId = GetUserIdFromJwt();
+            if (userId == 0) return Json(new { success = false });
 
             var summary = new
             {
@@ -335,8 +408,8 @@ namespace LeaveManagementSystem.Controllers
         // GET: Leave Balance Summary
         public async Task<JsonResult> GetLeaveBalanceSummary()
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null) return Json(new { success = false });
+            var userId = GetUserIdFromJwt();
+            if (userId == 0) return Json(new { success = false });
 
             var balances = await _context.LeaveBalances
                 .Include(b => b.LeaveType)
@@ -356,8 +429,8 @@ namespace LeaveManagementSystem.Controllers
         // GET: Leave Statistics (for chart)
         public async Task<JsonResult> GetLeaveStatistics()
         {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null) return Json(new { success = false });
+            var userId = GetUserIdFromJwt();
+            if (userId == 0) return Json(new { success = false });
 
             var stats = new
             {

@@ -1,9 +1,11 @@
-﻿@model List<LeaveManagementSystem.Models.Entities.User>
+﻿@using System.Security.Claims
+@model List<LeaveManagementSystem.Models.Entities.User>
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Team Members";
 
-    var managerId = Context.Session.GetInt32("UserId") ?? 0;
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var userId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
     var teamMemberDetails = ViewBag.TeamMemberDetails as List<LeaveManagementSystem.Controllers.ManagerDashboardController.TeamMemberDetail>;
 }
 

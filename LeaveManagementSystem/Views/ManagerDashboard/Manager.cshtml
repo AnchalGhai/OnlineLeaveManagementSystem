@@ -1,15 +1,23 @@
 ﻿@using Microsoft.EntityFrameworkCore
 @using LeaveManagementSystem.Models
+@using System.Security.Claims
 @inject DatabaseContext _context
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    // Check session
-    var managerId = Context.Session.GetInt32("UserId") ?? 0;
-    var managerName = Context.Session.GetString("UserName") ?? "Manager";
-    var role = Context.Session.GetString("Role");
-    var departmentId = Context.Session.GetString("DepartmentId");
+    // ✅ FIXED: Get from JWT Claims
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var managerId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
 
+    var managerName = User.FindFirstValue(ClaimTypes.Name) ?? "Manager";
+    var role = User.FindFirstValue(ClaimTypes.Role);
+
+    int? departmentId = null;
+    if (managerId > 0)
+    {
+        var manager = await _context.Users.FindAsync(managerId);
+        departmentId = manager?.DepartmentId;
+    }
     // Redirect if not manager
     if (role != "Manager")
     {
@@ -90,9 +98,9 @@
             <h2 class="mb-2"><i class="fas fa-user-tie me-2"></i>Manager Dashboard</h2>
             <p class="text-muted mb-0">
                 <i class="fas fa-user me-1"></i> Welcome, @managerName
-                @if (!string.IsNullOrEmpty(departmentId))
+                @if (departmentId.HasValue)
                 {
-                    var dept = await _context.Departments.FindAsync(int.Parse(departmentId));
+                    var dept = await _context.Departments.FindAsync(departmentId.Value);
                     if (dept != null)
                     {
                         <span> | <i class="fas fa-building me-1"></i> @dept.Name</span>

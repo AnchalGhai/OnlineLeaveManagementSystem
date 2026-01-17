@@ -1,13 +1,17 @@
 ﻿@using Microsoft.EntityFrameworkCore
 @using LeaveManagementSystem.Models
+@using System.Security.Claims
 @inject DatabaseContext _context
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     // Check session
-    var userId = Context.Session.GetInt32("UserId") ?? 0;
-    var userName = Context.Session.GetString("UserName") ?? "Employee";
-    var role = Context.Session.GetString("Role");
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var userId = userIdClaim != null ? int.Parse(userIdClaim) : 0;
+
+    var userName = User.FindFirstValue(ClaimTypes.Name) ?? "Employee";
+    var role = User.FindFirstValue(ClaimTypes.Role);
+
 
     // Redirect if not employee
     if (role != "Employee")
